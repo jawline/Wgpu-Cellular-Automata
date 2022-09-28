@@ -9,6 +9,7 @@ edition = "2021"
 wgpu = "0.13.1"
 glam = "0.21.3"
 bytemuck = "1.12.1"
+rand = "0.8.5"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 winit = "0.27.3"
