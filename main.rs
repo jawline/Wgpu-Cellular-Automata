@@ -13,10 +13,10 @@ use winit::{
     window::Window,
 };
 
+use obj::{Mesh, MeshRenderState};
 use triangle::{Triangle, TriangleRenderState};
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
-    let airboard = obj::ObjData::from_file("./airboat.obj").unwrap();
     let size = window.inner_size();
     let instance = wgpu::Instance::new(wgpu::Backends::all());
     let surface = unsafe { instance.create_surface(&window) };
@@ -67,6 +67,24 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     surface.configure(&device, &config);
 
     let triangle_render_state = TriangleRenderState::create(&device, swapchain_format);
+    let mesh_render_state = MeshRenderState::create(&device, swapchain_format);
+
+    let airboard = obj::Mesh::of_file(
+        &device,
+        Vec3 {
+            x: random(),
+            y: random(),
+            z: 0.,
+        },
+        Vec3 {
+            x: random(),
+            y: random(),
+            z: 0.,
+        },
+        &mesh_render_state,
+        "./airboat.obj",
+    )
+    .unwrap();
 
     let mut triangles: Vec<Triangle> = (0..5)
         .map(|i| {
