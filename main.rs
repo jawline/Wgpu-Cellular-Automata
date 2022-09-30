@@ -1,3 +1,4 @@
+mod obj;
 mod triangle;
 
 use rand::random;
@@ -15,6 +16,7 @@ use winit::{
 use triangle::{Triangle, TriangleRenderState};
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
+    let airboard = obj::ObjData::from_file("./airboat.obj").unwrap();
     let size = window.inner_size();
     let instance = wgpu::Instance::new(wgpu::Backends::all());
     let surface = unsafe { instance.create_surface(&window) };
