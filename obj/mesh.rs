@@ -46,8 +46,6 @@ impl MeshRenderState {
             push_constant_ranges: &[],
         });
 
-        println!("{:?}", mem::size_of::<Vertex>());
-
         let vertex_buffers = [wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
@@ -59,12 +57,12 @@ impl MeshRenderState {
                 },
                 wgpu::VertexAttribute {
                     format: wgpu::VertexFormat::Float32x3,
-                    offset: 0,
+                    offset: mem::size_of::<[f32; 3]>() as u64,
                     shader_location: 1,
                 },
                 wgpu::VertexAttribute {
                     format: wgpu::VertexFormat::Float32x3,
-                    offset: 0,
+                    offset: mem::size_of::<[f32; 3]>() as u64,
                     shader_location: 2,
                 },
             ],
@@ -126,8 +124,6 @@ pub struct Mesh {
     pub velocity: Vec3,
     pos_matrix: Buffer,
     vertices: Buffer,
-    texture_coordinates: Buffer,
-    normals: Buffer,
     face_indices: Vec<(u32, u32)>,
     pub bind_group: BindGroup,
 }
@@ -141,44 +137,29 @@ impl Mesh {
         file: &str,
     ) -> Result<Self, Box<dyn Error>> {
         let obj_data = Data::from_file(file)?;
-        let mut vertices = Vec::new();
-        let mut texture_coords = Vec::new();
-        let mut normals = Vec::new();
+        let mut vertices: Vec<Vertex> = Vec::new();
         let mut face_indices = Vec::new();
 
         let mut current_range = 0;
 
         for face in 0..obj_data.faces.len() {
             let face_data = Face::of_data(&obj_data, face);
-            for vertex in &face_data {
-                vertices.extend(vertex._pos);
-                texture_coords.extend(vertex._tex_coord);
-                normals.extend(vertex._normal);
-            }
+
             face_indices.push((
                 current_range as u32,
                 (current_range + face_data.len()) as u32,
             ));
-            current_range += face_data.len();
-        }
 
-        println!("{:?}", vertices);
+            current_range += face_data.len();
+
+            for vertex in face_data {
+                vertices.push(vertex);
+            }
+        }
 
         let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex"),
             contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let texture_coordinates = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("TextureCoord"),
-            contents: bytemuck::cast_slice(&texture_coords),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let normals = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Normal"),
-            contents: bytemuck::cast_slice(&normals),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -205,8 +186,6 @@ impl Mesh {
             velocity,
             pos_matrix: uniform_buf,
             vertices,
-            texture_coordinates,
-            normals,
             face_indices,
             bind_group,
         })
@@ -237,8 +216,6 @@ impl Mesh {
     pub fn draw<'pass, 'mesh: 'pass>(&'mesh self, pass: &mut RenderPass<'pass>) {
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_vertex_buffer(0, self.vertices.slice(..));
-        pass.set_vertex_buffer(1, self.texture_coordinates.slice(..));
-        pass.set_vertex_buffer(2, self.normals.slice(..));
         for &(start, end) in &self.face_indices {
             pass.draw(start..end, 0..1);
         }

@@ -37,7 +37,7 @@ impl Data {
                 self.vertices.push(Vec4::new(x, y, z, w));
                 Ok(())
             }
-            Some("tc") => {
+            Some("vt") => {
                 /* Texture coordinate */
                 let mut parts = parts.map(|x| x.parse::<f32>());
                 let u = parts.next().ok_or::<Box<dyn Error>>(
@@ -108,6 +108,11 @@ impl Data {
             }
             Some("s") =>
             /* TODO: Support smooth shading */
+            {
+                Ok(())
+            }
+            Some("o") =>
+            /* TODO: Support object groups */
             {
                 Ok(())
             }

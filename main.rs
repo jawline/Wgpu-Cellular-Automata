@@ -82,7 +82,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             z: 0.,
         },
         &mesh_render_state,
-        "./airboat.obj",
+        "./cube.obj",
     )
     .unwrap();
 
