@@ -125,6 +125,7 @@ pub struct Mesh {
     pos_matrix: Buffer,
     vertices: Buffer,
     face_indices: Vec<(u32, u32)>,
+    nv: usize,
     pub bind_group: BindGroup,
 }
 
@@ -151,6 +152,8 @@ impl Mesh {
             ));
 
             current_range += face_data.len();
+
+            println!("{:?}", face_data);
 
             for vertex in face_data {
                 vertices.push(vertex);
@@ -187,12 +190,13 @@ impl Mesh {
             pos_matrix: uniform_buf,
             vertices,
             face_indices,
+            nv: current_range,
             bind_group,
         })
     }
 
     pub fn to_matrix(&self) -> Mat4 {
-        Mat4::IDENTITY + Mat4::from_translation(self.pos)
+        Mat4::perspective_lh(1.5708, 16. / 9., 0., 1.) + Mat4::from_translation(self.pos)
     }
 
     pub fn update(&mut self, elapsed: Duration, queue: &Queue) {
@@ -204,6 +208,10 @@ impl Mesh {
 
         if self.pos.y < -1. || self.pos.y > 1. {
             self.velocity.y = -self.velocity.y;
+        }
+
+        if self.pos.z < -1. || self.pos.z > 1. {
+            self.velocity.z = -self.velocity.z;
         }
 
         queue.write_buffer(

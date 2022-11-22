@@ -74,12 +74,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         Vec3 {
             x: random(),
             y: random(),
-            z: 0.,
+            z: random(),
         },
         Vec3 {
             x: random(),
             y: random(),
-            z: 0.,
+            z: random(),
         },
         &mesh_render_state,
         "./cube.obj",

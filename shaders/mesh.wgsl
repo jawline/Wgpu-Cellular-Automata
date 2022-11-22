@@ -1,6 +1,3 @@
-let ROW_SIZE: f32 = 0.1;
-let ROW_VERTEX_COUNT: u32 = 30u;
-
 let LIGHT_DIRECTION: vec3<f32> = vec3<f32>(0., 0., 0.);
 
 @group(0)
