@@ -13,7 +13,7 @@ use winit::{
     window::Window,
 };
 
-use obj::{Mesh, MeshRenderState};
+use obj::MeshRenderState;
 use triangle::{Triangle, TriangleRenderState};
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
@@ -69,7 +69,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let triangle_render_state = TriangleRenderState::create(&device, swapchain_format);
     let mesh_render_state = MeshRenderState::create(&device, swapchain_format);
 
-    let airboard = obj::Mesh::of_file(
+    let mut airboat = obj::Mesh::of_file(
         &device,
         Vec3 {
             x: random(),
@@ -159,6 +159,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         rpass.set_bind_group(0, &triangle.bind_group, &[]);
                         triangle.draw(&mut rpass);
                     }
+
+                    airboat.update(elapsed, &queue);
+                    rpass.set_bind_group(0, &airboat.bind_group, &[]);
+                    airboat.draw(&mut rpass);
                 }
 
                 queue.submit(Some(encoder.finish()));
