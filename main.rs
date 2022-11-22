@@ -1,5 +1,4 @@
 mod obj;
-mod triangle;
 
 use rand::random;
 use std::borrow::Cow;
@@ -14,7 +13,6 @@ use winit::{
 };
 
 use obj::MeshRenderState;
-use triangle::{Triangle, TriangleRenderState};
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let size = window.inner_size();
@@ -43,11 +41,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .await
         .expect("Failed to create device");
 
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shaders/triangles.wgsl"))),
-    });
-
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
         bind_group_layouts: &[],
@@ -66,7 +59,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     surface.configure(&device, &config);
 
-    let triangle_render_state = TriangleRenderState::create(&device, swapchain_format);
     let mesh_render_state = MeshRenderState::create(&device, swapchain_format);
 
     let mut airboat = obj::Mesh::of_file(
@@ -74,36 +66,17 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         Vec3 {
             x: random(),
             y: random(),
-            z: random(),
+            z: 0.,
         },
         Vec3 {
             x: random(),
             y: random(),
-            z: random(),
+            z: 0.,
         },
         &mesh_render_state,
         "./cube.obj",
     )
     .unwrap();
-
-    let mut triangles: Vec<Triangle> = (0..5)
-        .map(|i| {
-            Triangle::create(
-                &device,
-                Vec3 {
-                    x: random(),
-                    y: random(),
-                    z: 0.,
-                },
-                Vec3 {
-                    x: random(),
-                    y: random(),
-                    z: 0.,
-                },
-                &triangle_render_state,
-            )
-        })
-        .collect();
 
     let mut last_draw = Instant::now();
 
@@ -111,7 +84,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         // Have the closure take ownership of the resources.
         // `event_loop.run` never returns, therefore we must do this to ensure
         // the resources are properly cleaned up.
-        let _ = (&instance, &adapter, &shader, &pipeline_layout);
+        let _ = (&instance, &adapter, &pipeline_layout);
 
         *control_flow = ControlFlow::Wait;
         match event {
@@ -152,16 +125,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         depth_stencil_attachment: None,
                     });
 
-                    rpass.set_pipeline(&triangle_render_state.pipeline);
-
-                    for (index, triangle) in triangles.iter_mut().enumerate() {
-                        triangle.update(elapsed, &queue);
-                        rpass.set_bind_group(0, &triangle.bind_group, &[]);
-                        triangle.draw(&mut rpass);
-                    }
-
                     airboat.update(elapsed, &queue);
-                    airboat.draw(&mut rpass);
+                    airboat.draw(&mut rpass, &mesh_render_state);
                 }
 
                 queue.submit(Some(encoder.finish()));

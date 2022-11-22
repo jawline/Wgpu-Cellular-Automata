@@ -1,3 +1,4 @@
+use log::debug;
 use std::error::Error;
 use std::mem;
 
@@ -12,6 +13,8 @@ use wgpu::{
 
 use super::data::Data;
 use super::mesh_vertex::Vertex;
+
+const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 pub struct MeshRenderState {
     pub pipeline: RenderPipeline,
@@ -46,26 +49,12 @@ impl MeshRenderState {
             push_constant_ranges: &[],
         });
 
+        debug!("Vertex buffer stride: {:?}", mem::size_of::<Vertex>());
+
         let vertex_buffers = [wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x4,
-                    offset: 0,
-                    shader_location: 0,
-                },
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: mem::size_of::<[f32; 3]>() as u64,
-                    shader_location: 1,
-                },
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: mem::size_of::<[f32; 3]>() as u64,
-                    shader_location: 2,
-                },
-            ],
+            attributes: &wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x3, 2 => Float32x3],
         }];
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -81,8 +70,12 @@ impl MeshRenderState {
                 entry_point: "fs_main",
                 targets: &[Some(swapchain_format.into())],
             }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
+            primitive: wgpu::PrimitiveState {
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                ..Default::default()
+            },
+            depth_stencil: /* TODO: Add a depth buffer */ None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
         });
@@ -125,7 +118,6 @@ pub struct Mesh {
     pos_matrix: Buffer,
     vertices: Buffer,
     face_indices: Vec<(u32, u32)>,
-    nv: usize,
     pub bind_group: BindGroup,
 }
 
@@ -190,13 +182,20 @@ impl Mesh {
             pos_matrix: uniform_buf,
             vertices,
             face_indices,
-            nv: current_range,
             bind_group,
         })
     }
 
     pub fn to_matrix(&self) -> Mat4 {
-        Mat4::perspective_lh(1.5708, 16. / 9., 0., 1.) + Mat4::from_translation(self.pos)
+        let projection = Mat4::perspective_lh(90. * 3.14592 / 180., 1024. / 728., 1., 1000.);
+        let view = Mat4::look_at_lh(Vec3::new(0., 0., -300.), Vec3::new(0., 0., 0.), Vec3::Z);
+        //let projection = glam::Mat4::perspective_rh(3.141592 / 4., 16. / 9., 1.0, 20.0);
+        //let view = glam::Mat4::look_at_rh(
+        //    glam::Vec3::new(0., 0., 0.),
+        //    glam::Vec3::new(0f32, 0.0, 1.),
+        //    glam::Vec3::Z,
+        //);
+        projection * view
     }
 
     pub fn update(&mut self, elapsed: Duration, queue: &Queue) {
@@ -210,10 +209,6 @@ impl Mesh {
             self.velocity.y = -self.velocity.y;
         }
 
-        if self.pos.z < -1. || self.pos.z > 1. {
-            self.velocity.z = -self.velocity.z;
-        }
-
         queue.write_buffer(
             &self.pos_matrix,
             0,
@@ -221,7 +216,12 @@ impl Mesh {
         );
     }
 
-    pub fn draw<'pass, 'mesh: 'pass>(&'mesh self, pass: &mut RenderPass<'pass>) {
+    pub fn draw<'pass, 'mesh: 'pass>(
+        &'mesh self,
+        pass: &mut RenderPass<'pass>,
+        render_state: &'mesh MeshRenderState,
+    ) {
+        pass.set_pipeline(&render_state.pipeline);
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_vertex_buffer(0, self.vertices.slice(..));
         for &(start, end) in &self.face_indices {
