@@ -161,7 +161,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     }
 
                     airboat.update(elapsed, &queue);
-                    rpass.set_bind_group(0, &airboat.bind_group, &[]);
                     airboat.draw(&mut rpass);
                 }
 

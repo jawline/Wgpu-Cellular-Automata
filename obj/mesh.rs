@@ -37,9 +37,7 @@ impl MeshRenderState {
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-                "../shaders/triangles.wgsl"
-            ))),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("../shaders/mesh.wgsl"))),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -48,8 +46,10 @@ impl MeshRenderState {
             push_constant_ranges: &[],
         });
 
+        println!("{:?}", mem::size_of::<Vertex>());
+
         let vertex_buffers = [wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Vertex> as wgpu::BufferAddress,
+            array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
                 wgpu::VertexAttribute {
@@ -59,12 +59,12 @@ impl MeshRenderState {
                 },
                 wgpu::VertexAttribute {
                     format: wgpu::VertexFormat::Float32x3,
-                    offset: 4 * 4,
+                    offset: 0,
                     shader_location: 1,
                 },
                 wgpu::VertexAttribute {
                     format: wgpu::VertexFormat::Float32x3,
-                    offset: 4 * 7,
+                    offset: 0,
                     shader_location: 2,
                 },
             ],
@@ -76,7 +76,7 @@ impl MeshRenderState {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[],
+                buffers: &vertex_buffers,
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -128,6 +128,7 @@ pub struct Mesh {
     vertices: Buffer,
     texture_coordinates: Buffer,
     normals: Buffer,
+    face_indices: Vec<(u32, u32)>,
     pub bind_group: BindGroup,
 }
 
@@ -143,13 +144,22 @@ impl Mesh {
         let mut vertices = Vec::new();
         let mut texture_coords = Vec::new();
         let mut normals = Vec::new();
+        let mut face_indices = Vec::new();
+
+        let mut current_range = 0;
 
         for face in 0..obj_data.faces.len() {
-            for vertex in Face::of_data(&obj_data, face) {
+            let face_data = Face::of_data(&obj_data, face);
+            for vertex in &face_data {
                 vertices.extend(vertex._pos);
                 texture_coords.extend(vertex._tex_coord);
                 normals.extend(vertex._normal);
             }
+            face_indices.push((
+                current_range as u32,
+                (current_range + face_data.len()) as u32,
+            ));
+            current_range += face_data.len();
         }
 
         println!("{:?}", vertices);
@@ -197,6 +207,7 @@ impl Mesh {
             vertices,
             texture_coordinates,
             normals,
+            face_indices,
             bind_group,
         })
     }
@@ -223,7 +234,13 @@ impl Mesh {
         );
     }
 
-    pub fn draw(&self, pass: &mut RenderPass) {
-        pass.draw(0..3, 0..1);
+    pub fn draw<'pass, 'mesh: 'pass>(&'mesh self, pass: &mut RenderPass<'pass>) {
+        pass.set_bind_group(0, &self.bind_group, &[]);
+        pass.set_vertex_buffer(0, self.vertices.slice(..));
+        pass.set_vertex_buffer(1, self.texture_coordinates.slice(..));
+        pass.set_vertex_buffer(2, self.normals.slice(..));
+        for &(start, end) in &self.face_indices {
+            pass.draw(start..end, 0..1);
+        }
     }
 }
