@@ -97,7 +97,6 @@ impl Face {
         let face = &data.faces[index];
 
         for element in face {
-            println!("{:?} {}", element, data.vertices.len());
             let vertex = Vertex::new(
                 &data.vertices[element.vertex - 1],
                 &element
@@ -118,6 +117,7 @@ pub struct Mesh {
     pos_matrix: Buffer,
     vertices: Buffer,
     face_indices: Vec<(u32, u32)>,
+    total_vertices: usize,
     pub bind_group: BindGroup,
 }
 
@@ -145,9 +145,8 @@ impl Mesh {
 
             current_range += face_data.len();
 
-            println!("{:?}", face_data);
-
             for vertex in face_data {
+                println!("{:?}", vertex);
                 vertices.push(vertex);
             }
         }
@@ -155,7 +154,7 @@ impl Mesh {
         let vertices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex"),
             contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::VERTEX,
         });
 
         let mx_total = Mat4::IDENTITY;
@@ -183,36 +182,35 @@ impl Mesh {
             vertices,
             face_indices,
             bind_group,
+            total_vertices: current_range,
         })
     }
 
-    pub fn to_matrix(&self) -> Mat4 {
-        let projection = Mat4::perspective_lh(90. * 3.14592 / 180., 1024. / 728., 1., 1000.);
-        let view = Mat4::look_at_lh(Vec3::new(0., 0., -300.), Vec3::new(0., 0., 0.), Vec3::Z);
-        //let projection = glam::Mat4::perspective_rh(3.141592 / 4., 16. / 9., 1.0, 20.0);
-        //let view = glam::Mat4::look_at_rh(
-        //    glam::Vec3::new(0., 0., 0.),
-        //    glam::Vec3::new(0f32, 0.0, 1.),
-        //    glam::Vec3::Z,
-        //);
-        projection * view
+    pub fn view(&self) -> Mat4 {
+        Mat4::from_translation(self.pos)
     }
 
-    pub fn update(&mut self, elapsed: Duration, queue: &Queue) {
+    pub fn update(&mut self, elapsed: Duration, projection: &Mat4, queue: &Queue) {
         self.pos += self.velocity * elapsed.as_secs_f32();
 
-        if self.pos.x < -1. || self.pos.x > 1. {
+        if self.pos.x < -5. || self.pos.x > 5. {
             self.velocity.x = -self.velocity.x;
         }
 
-        if self.pos.y < -1. || self.pos.y > 1. {
+        if self.pos.y < -5. || self.pos.y > 5. {
             self.velocity.y = -self.velocity.y;
         }
+
+        if self.pos.z < -5. || self.pos.z > 5. {
+            self.velocity.z = -self.velocity.z;
+        }
+
+        let projection = *projection * self.view();
 
         queue.write_buffer(
             &self.pos_matrix,
             0,
-            bytemuck::cast_slice(self.to_matrix().as_ref()),
+            bytemuck::cast_slice(projection.as_ref()),
         );
     }
 
@@ -224,8 +222,6 @@ impl Mesh {
         pass.set_pipeline(&render_state.pipeline);
         pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_vertex_buffer(0, self.vertices.slice(..));
-        for &(start, end) in &self.face_indices {
-            pass.draw(start..end, 0..1);
-        }
+        pass.draw(0..self.total_vertices as u32, 0..1);
     }
 }

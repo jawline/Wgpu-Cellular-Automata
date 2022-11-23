@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
 
-#[repr(C, packed)]
+#[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy, Debug)]
 pub struct Vertex {
     pub _pos: [f32; 4],

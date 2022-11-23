@@ -4,7 +4,7 @@ use rand::random;
 use std::borrow::Cow;
 use std::time::Instant;
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 
 use winit::{
     event::{Event, WindowEvent},
@@ -66,12 +66,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         Vec3 {
             x: random(),
             y: random(),
-            z: 0.,
+            z: random(),
         },
         Vec3 {
             x: random(),
             y: random(),
-            z: 0.,
+            z: random(),
         },
         &mesh_render_state,
         "./cube.obj",
@@ -125,7 +125,17 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         depth_stencil_attachment: None,
                     });
 
-                    airboat.update(elapsed, &queue);
+                    let projection = glam::Mat4::perspective_rh(
+                        90. * (std::f32::consts::PI / 180.),
+                        config.width as f32 / config.height as f32,
+                        1.,
+                        50.,
+                    );
+
+                    let view = Mat4::from_translation(Vec3::new(0., 0., -7.));
+                    //Mat4::look_at_lh(Vec3::new(0., 0., 5.), Vec3::new(0., 0., 0.), Vec3::Z);
+
+                    airboat.update(elapsed, &(projection * view), &queue);
                     airboat.draw(&mut rpass, &mesh_render_state);
                 }
 
