@@ -3,6 +3,7 @@ use std::error::Error;
 use std::mem;
 
 use std::borrow::Cow;
+use std::ops::Range;
 use std::time::Duration;
 
 use failure::format_err;
@@ -107,7 +108,7 @@ impl MeshInstance {
 }
 
 pub struct MeshInstances {
-    instances: Vec<MeshInstance>,
+    pub instances: Vec<MeshInstance>,
     buffer: Buffer,
 }
 
@@ -120,13 +121,23 @@ impl MeshInstances {
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Mesh Instance Buffer"),
             contents: bytemuck::cast_slice(&instance_data),
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
         Self { instances, buffer }
     }
 
     pub fn count(&self) -> u32 {
         self.instances.len() as u32
+    }
+
+    pub fn update(&self, queue: &Queue) {
+        // TODO: Duplication of instance data
+        let instance_data: Vec<_> = self
+            .instances
+            .iter()
+            .map(|x| x.to_matrix().as_ref().clone())
+            .collect();
+        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&instance_data));
     }
 
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
@@ -214,10 +225,11 @@ impl Mesh {
         pass: &mut RenderPass<'pass>,
         render_state: &'mesh MeshRenderState,
         instances: &'mesh MeshInstances,
+        instance_range: Range<u32>,
     ) {
         pass.set_pipeline(&render_state.pipeline);
         pass.set_vertex_buffer(0, self.vertices.slice(..));
         pass.set_vertex_buffer(1, instances.buffer.slice(..));
-        pass.draw(0..self.total_vertices as u32, 0..instances.count());
+        pass.draw(0..self.total_vertices as u32, instance_range);
     }
 }

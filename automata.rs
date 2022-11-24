@@ -26,9 +26,36 @@ impl Cell {
     }
 }
 
+struct DoubleBuffer {
+    buffers: [Vec<Cell>; 2],
+    i: usize,
+}
+
+impl DoubleBuffer {
+    fn new(cells: Vec<Cell>) -> Self {
+        let second = (0..cells.len()).map(|_| Cell::Empty).collect();
+        Self {
+            buffers: [cells, second],
+            i: 0,
+        }
+    }
+
+    fn read(&self) -> &Vec<Cell> {
+        &self.buffers[self.i]
+    }
+
+    fn write(&mut self) -> &mut Vec<Cell> {
+        &mut self.buffers[(self.i + 1) % 2]
+    }
+
+    fn next(&mut self) {
+        self.i = (self.i + 1) % 2;
+    }
+}
+
 pub struct Automata {
     pub dim: Vec3,
-    pub cells: Vec<Cell>,
+    buffer: DoubleBuffer,
 }
 
 impl Automata {
@@ -36,30 +63,34 @@ impl Automata {
     pub fn new(dim: &Vec3) -> Self {
         Self {
             dim: *dim,
-            cells: vec![
-                if rand::random() {
-                    Cell::Alive
-                } else {
-                    Cell::Empty
-                };
-                dim.x * dim.y * dim.z
-            ],
+            buffer: DoubleBuffer::new(
+                (0..(dim.x * dim.y * dim.z))
+                    .map(|_| {
+                        if rand::random() {
+                            Cell::Alive
+                        } else {
+                            Cell::Empty
+                        }
+                    })
+                    .collect(),
+            ),
         }
     }
 
-    fn offset(&self, pos: &Vec3) -> usize {
+    pub fn offset(&self, pos: &Vec3) -> usize {
         let size_of_layer = self.dim.x * self.dim.y;
         let offset_in_layer_to_row = self.dim.x * pos.y;
-        size_of_layer + offset_in_layer_to_row + pos.x
+        (size_of_layer * pos.z) + offset_in_layer_to_row + pos.x
     }
 
     pub fn get(&self, pos: &Vec3) -> Cell {
-        self.cells[self.offset(pos)]
+        let offset = self.offset(pos);
+        self.buffer.read()[offset]
     }
 
     pub fn set(&mut self, pos: &Vec3, cell: Cell) {
         let offset = self.offset(pos);
-        self.cells[offset] = cell;
+        self.buffer.write()[offset] = cell;
     }
 
     fn neighbors(&self, pos: &Vec3) -> usize {
@@ -77,9 +108,9 @@ impl Automata {
             for x in 0..3 {
                 for y in 0..3 {
                     for z in 0..3 {
-                        sum += self
-                            .get(&Vec3::new(pos.x - 1 + x, pos.y - 1 + y, pos.z - 1 + z))
-                            .count();
+                        let cell =
+                            self.get(&Vec3::new(pos.x - 1 + x, pos.y - 1 + y, pos.z - 1 + z));
+                        sum += cell.count();
                     }
                 }
             }
@@ -98,7 +129,7 @@ impl Automata {
                     let neighbors = self.neighbors(&pos);
 
                     let cell = match neighbors {
-                        3 | 4 | 5 => {
+                        1 | 2 | 3 | 4 | 5 => {
                             f(&pos);
                             Cell::Alive
                         }
@@ -106,8 +137,10 @@ impl Automata {
                     };
 
                     self.set(&pos, cell);
+                    let offset = self.offset(&pos);
                 }
             }
         }
+        self.buffer.next();
     }
 }

@@ -4,9 +4,9 @@ mod obj;
 use automata::Automata;
 use rand::random;
 use std::collections::VecDeque;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-use glam::{Mat4, Vec3, Quat};
+use glam::{Mat4, Quat, Vec3};
 
 use wgpu::util::DeviceExt;
 use winit::{
@@ -16,6 +16,8 @@ use winit::{
 };
 
 use obj::{MeshInstance, MeshInstances, MeshRenderState};
+
+const FRAME_DELAY: Duration = Duration::new(0, 250000000);
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let size = window.inner_size();
@@ -96,14 +98,26 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     let mesh_render_state = MeshRenderState::create(&device, &bind_group_layout, swapchain_format);
-    let mut cube_instances = MeshInstances::new((0..(20 * 20 * 20)).map(|_| { MeshInstance {
-        position: Vec3::new(random::<f32>() * 30., random::<f32>() * 30., random::<f32>() * 30.),
-        rotation: Quat::IDENTITY,
-    } } ).collect(), &device);
+    let mut cube_instances = MeshInstances::new(
+        (0..(20 * 20 * 20))
+            .map(|_| MeshInstance {
+                position: Vec3::new(
+                    random::<f32>() * 30.,
+                    random::<f32>() * 30.,
+                    random::<f32>() * 30.,
+                ),
+                rotation: Quat::IDENTITY,
+            })
+            .collect(),
+        &device,
+    );
     let cube = obj::Mesh::of_file(&device, "./cube.obj").unwrap();
 
     let mut last_draw = Instant::now();
     let mut automata = Automata::new(&automata::Vec3::new(20, 20, 20));
+
+    let mut since_last_update = FRAME_DELAY;
+    let mut instance_id = 0;
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -157,7 +171,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         50.,
                     );
 
-                    let view = Mat4::from_translation(Vec3::new(-15., -15., -20.));
+                    let view = Mat4::from_translation(Vec3::new(-10., -10., -30.));
 
                     let projection_by_view = projection * view;
 
@@ -172,11 +186,35 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     // in that lasts sufficiently long to draw the rpass
                     // I think I can refactor cube into cube.prepare, update and draw to avoid
                     // this?
-                    //
 
-                    automata.update(|usize_pos| {});
+                    since_last_update += elapsed;
+                    if since_last_update >= FRAME_DELAY {
+                        since_last_update = Duration::new(0, 0);
 
-                    cube.draw(&mut rpass, &mesh_render_state, &cube_instances);
+                        for instance in &mut cube_instances.instances {
+                            instance.position.x = -50000.;
+                        }
+
+                        instance_id = 0;
+
+                        automata.update(|usize_pos| {
+                            let pos = Vec3::new(
+                                usize_pos.x as f32,
+                                usize_pos.y as f32,
+                                usize_pos.z as f32,
+                            );
+                            cube_instances.instances[instance_id].position = pos;
+                            instance_id += 1;
+                        });
+                        cube_instances.update(&queue);
+                    }
+
+                    cube.draw(
+                        &mut rpass,
+                        &mesh_render_state,
+                        &cube_instances,
+                        0..instance_id as u32,
+                    );
                 }
 
                 queue.submit(Some(encoder.finish()));
