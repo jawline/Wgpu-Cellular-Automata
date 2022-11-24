@@ -7,10 +7,10 @@ use std::time::Duration;
 
 use failure::format_err;
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Quat, Vec3};
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Device, Queue, RenderPass, RenderPipeline,
-    TextureFormat,
+    TextureFormat, VertexAttribute, VertexBufferLayout,
 };
 
 use super::data::Data;
@@ -42,19 +42,13 @@ impl MeshRenderState {
 
         debug!("Vertex buffer stride: {:?}", mem::size_of::<Vertex>());
 
-        let vertex_buffers = [wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x3, 2 => Float32x3],
-        }];
-
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &vertex_buffers,
+                buffers: &[Mesh::desc(), MeshInstances::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -101,6 +95,51 @@ impl Face {
     }
 }
 
+pub struct MeshInstance {
+    pub position: Vec3,
+    pub rotation: Quat,
+}
+
+impl MeshInstance {
+    fn to_matrix(&self) -> Mat4 {
+        Mat4::from_rotation_translation(self.rotation, self.position)
+    }
+}
+
+pub struct MeshInstances {
+    instances: Vec<MeshInstance>,
+    buffer: Buffer,
+}
+
+impl MeshInstances {
+    pub fn new(instances: Vec<MeshInstance>, device: &Device) -> Self {
+        let instance_data: Vec<_> = instances
+            .iter()
+            .map(|x| x.to_matrix().as_ref().clone())
+            .collect();
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Mesh Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        Self { instances, buffer }
+    }
+
+    pub fn count(&self) -> u32 {
+        self.instances.len() as u32
+    }
+
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        use std::mem;
+        const ATTRS: [VertexAttribute; 4] = wgpu::vertex_attr_array![5 => Float32x4 , 6 => Float32x4 , 7 => Float32x4 , 8 => Float32x4];
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &ATTRS,
+        }
+    }
+}
+
 pub struct Mesh {
     pub vertices: Buffer,
     face_indices: Vec<(u32, u32)>,
@@ -108,6 +147,17 @@ pub struct Mesh {
 }
 
 impl Mesh {
+    fn desc<'a>() -> VertexBufferLayout<'a> {
+        use std::mem;
+        const ATTRS: [VertexAttribute; 3] =
+            wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x3, 2 => Float32x3];
+        VertexBufferLayout {
+            array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &ATTRS,
+        }
+    }
+
     pub fn of_file(device: &Device, file: &str) -> Result<Self, Box<dyn Error>> {
         let obj_data = Data::from_file(file)?;
         let mut vertices: Vec<Vertex> = Vec::new();
@@ -163,9 +213,11 @@ impl Mesh {
         &'mesh self,
         pass: &mut RenderPass<'pass>,
         render_state: &'mesh MeshRenderState,
+        instances: &'mesh MeshInstances,
     ) {
         pass.set_pipeline(&render_state.pipeline);
         pass.set_vertex_buffer(0, self.vertices.slice(..));
-        pass.draw(0..self.total_vertices as u32, 0..1);
+        pass.set_vertex_buffer(1, instances.buffer.slice(..));
+        pass.draw(0..self.total_vertices as u32, 0..instances.count());
     }
 }

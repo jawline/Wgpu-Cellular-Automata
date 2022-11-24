@@ -3,4 +3,4 @@ mod face_element;
 mod mesh;
 mod mesh_vertex;
 
-pub use mesh::{Mesh, MeshRenderState};
+pub use mesh::{Mesh, MeshRenderState, MeshInstance, MeshInstances};

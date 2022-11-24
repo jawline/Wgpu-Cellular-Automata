@@ -6,7 +6,7 @@ use rand::random;
 use std::collections::VecDeque;
 use std::time::Instant;
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, Quat};
 
 use wgpu::util::DeviceExt;
 use winit::{
@@ -15,7 +15,7 @@ use winit::{
     window::Window,
 };
 
-use obj::MeshRenderState;
+use obj::{MeshInstance, MeshInstances, MeshRenderState};
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let size = window.inner_size();
@@ -96,8 +96,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     let mesh_render_state = MeshRenderState::create(&device, &bind_group_layout, swapchain_format);
-
-    let mut cube = obj::Mesh::of_file(&device, "./cube.obj").unwrap();
+    let mut cube_instances = MeshInstances::new((0..(20 * 20 * 20)).map(|_| { MeshInstance {
+        position: Vec3::new(random::<f32>() * 30., random::<f32>() * 30., random::<f32>() * 30.),
+        rotation: Quat::IDENTITY,
+    } } ).collect(), &device);
+    let cube = obj::Mesh::of_file(&device, "./cube.obj").unwrap();
 
     let mut last_draw = Instant::now();
     let mut automata = Automata::new(&automata::Vec3::new(20, 20, 20));
@@ -154,7 +157,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         50.,
                     );
 
-                    let view = Mat4::from_translation(Vec3::new(0., 0., -5.));
+                    let view = Mat4::from_translation(Vec3::new(-15., -15., -20.));
 
                     let projection_by_view = projection * view;
 
@@ -173,7 +176,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                     automata.update(|usize_pos| {});
 
-                    cube.draw(&mut rpass, &mesh_render_state);
+                    cube.draw(&mut rpass, &mesh_render_state, &cube_instances);
                 }
 
                 queue.submit(Some(encoder.finish()));
