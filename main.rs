@@ -1,11 +1,14 @@
+mod automata;
 mod obj;
 
+use automata::Automata;
 use rand::random;
-use std::borrow::Cow;
+use std::collections::VecDeque;
 use std::time::Instant;
 
 use glam::{Mat4, Vec3};
 
+use wgpu::util::DeviceExt;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -59,26 +62,45 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     surface.configure(&device, &config);
 
-    let mesh_render_state = MeshRenderState::create(&device, swapchain_format);
+    // TODO: Move this bind group logic to its own home
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: None,
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: wgpu::BufferSize::new(64),
+            },
+            count: None,
+        }],
+    });
 
-    let mut airboat = obj::Mesh::of_file(
-        &device,
-        Vec3 {
-            x: random(),
-            y: random(),
-            z: random(),
-        },
-        Vec3 {
-            x: random(),
-            y: random(),
-            z: random(),
-        },
-        &mesh_render_state,
-        "./cube.obj",
-    )
-    .unwrap();
+    let mx_total = Mat4::IDENTITY;
+    let mx_ref: &[f32; 16] = mx_total.as_ref();
+
+    let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Projection Matrix"),
+        contents: bytemuck::cast_slice(mx_ref),
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    });
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: uniform_buf.as_entire_binding(),
+        }],
+        label: None,
+    });
+
+    let mesh_render_state = MeshRenderState::create(&device, &bind_group_layout, swapchain_format);
+
+    let mut cube = obj::Mesh::of_file(&device, "./cube.obj").unwrap();
 
     let mut last_draw = Instant::now();
+    let mut automata = Automata::new(&automata::Vec3::new(20, 20, 20));
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -132,11 +154,26 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         50.,
                     );
 
-                    let view = Mat4::from_translation(Vec3::new(0., 0., -7.));
-                    //Mat4::look_at_lh(Vec3::new(0., 0., 5.), Vec3::new(0., 0., 0.), Vec3::Z);
+                    let view = Mat4::from_translation(Vec3::new(0., 0., -5.));
 
-                    airboat.update(elapsed, &(projection * view), &queue);
-                    airboat.draw(&mut rpass, &mesh_render_state);
+                    let projection_by_view = projection * view;
+
+                    queue.write_buffer(
+                        &uniform_buf,
+                        0,
+                        bytemuck::cast_slice(projection_by_view.as_ref()),
+                    );
+                    rpass.set_bind_group(0, &bind_group, &[]);
+
+                    // TODO: This makes me sad, I can't figure out how to pass a reference to cube
+                    // in that lasts sufficiently long to draw the rpass
+                    // I think I can refactor cube into cube.prepare, update and draw to avoid
+                    // this?
+                    //
+
+                    automata.update(|usize_pos| {});
+
+                    cube.draw(&mut rpass, &mesh_render_state);
                 }
 
                 queue.submit(Some(encoder.finish()));
