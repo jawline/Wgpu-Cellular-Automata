@@ -6,7 +6,7 @@ use rand::random;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-use glam::{Mat4, Quat, Vec3};
+use glam::{u32::UVec3, Mat4, Quat, Vec3};
 
 use wgpu::util::DeviceExt;
 use winit::{
@@ -38,8 +38,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             &wgpu::DeviceDescriptor {
                 label: None,
                 features: wgpu::Features::empty(),
-                limits: wgpu::Limits::downlevel_webgl2_defaults()
-                    .using_resolution(adapter.limits()),
+                limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
             },
             None,
         )
@@ -111,10 +110,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             .collect(),
         &device,
     );
-    let cube = obj::Mesh::of_file(&device, "./cube.obj").unwrap();
+    let cube = obj::Mesh::of_file(&device, "./test_models/cube.obj").unwrap();
 
     let mut last_draw = Instant::now();
-    let mut automata = Automata::new(&automata::Vec3::new(20, 20, 20));
+    let mut automata = Automata::new(&UVec3::new(30, 25, 20), &device);
 
     let mut since_last_update = FRAME_DELAY;
     let mut instance_id = 0;
@@ -170,8 +169,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         1.,
                         50.,
                     );
-
-                    let view = Mat4::from_translation(Vec3::new(-10., -10., -30.));
+                    let view = Mat4::from_translation(Vec3::new(-20., -15., -30.));
 
                     let projection_by_view = projection * view;
 
@@ -197,15 +195,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                         instance_id = 0;
 
-                        automata.update(|usize_pos| {
-                            let pos = Vec3::new(
-                                usize_pos.x as f32,
-                                usize_pos.y as f32,
-                                usize_pos.z as f32,
-                            );
-                            cube_instances.instances[instance_id].position = pos;
-                            instance_id += 1;
-                        });
+                        let frame = automata.update(&device, &queue);
+                        println!("{:?}", frame);
                         cube_instances.update(&queue);
                     }
 

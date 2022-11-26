@@ -66,7 +66,7 @@ impl Automata {
             buffer: DoubleBuffer::new(
                 (0..(dim.x * dim.y * dim.z))
                     .map(|_| {
-                        if rand::random() {
+                        if rand::random::<f32>() <= 0.001 {
                             Cell::Alive
                         } else {
                             Cell::Empty
@@ -114,7 +114,7 @@ impl Automata {
                     }
                 }
             }
-            sum
+            sum - self.get(pos).count()
         }
     }
 
@@ -129,7 +129,7 @@ impl Automata {
                     let neighbors = self.neighbors(&pos);
 
                     let cell = match neighbors {
-                        1 | 2 | 3 | 4 | 5 => {
+                        2 | 3 | 4 => {
                             f(&pos);
                             Cell::Alive
                         }
