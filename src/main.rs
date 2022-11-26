@@ -3,7 +3,6 @@ mod obj;
 
 use automata::Automata;
 use rand::random;
-use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use glam::{u32::UVec3, Mat4, Quat, Vec3};
@@ -113,7 +112,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let cube = obj::Mesh::of_file(&device, "./test_models/cube.obj").unwrap();
 
     let mut last_draw = Instant::now();
-    let mut automata = Automata::new(&UVec3::new(30, 25, 20), &device);
+    let mut automata = Automata::new(&UVec3::new(6, 6, 6), &device);
 
     let mut since_last_update = FRAME_DELAY;
     let mut instance_id = 0;

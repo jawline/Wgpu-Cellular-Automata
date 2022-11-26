@@ -4,20 +4,19 @@ use std::mem;
 
 use std::borrow::Cow;
 use std::ops::Range;
-use std::time::Duration;
 
 use failure::format_err;
 
 use glam::{Mat4, Quat, Vec3};
 use wgpu::{
-    util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Device, Queue, RenderPass, RenderPipeline,
+    util::DeviceExt, BindGroupLayout, Buffer, Device, Queue, RenderPass, RenderPipeline,
     TextureFormat, VertexAttribute, VertexBufferLayout,
 };
 
 use super::data::Data;
 use super::mesh_vertex::Vertex;
 
-const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+const _DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 pub struct MeshRenderState {
     pub pipeline: RenderPipeline,
@@ -128,7 +127,7 @@ impl MeshInstances {
         Self { instances, buffer }
     }
 
-    pub fn count(&self) -> u32 {
+    pub fn _count(&self) -> u32 {
         self.instances.len() as u32
     }
 
@@ -143,7 +142,6 @@ impl MeshInstances {
     }
 
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        use std::mem;
         const ATTRS: [VertexAttribute; 4] = wgpu::vertex_attr_array![5 => Float32x4 , 6 => Float32x4 , 7 => Float32x4 , 8 => Float32x4];
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
@@ -155,13 +153,11 @@ impl MeshInstances {
 
 pub struct Mesh {
     pub vertices: Buffer,
-    face_indices: Vec<(u32, u32)>,
     total_vertices: usize,
 }
 
 impl Mesh {
     fn desc<'a>() -> VertexBufferLayout<'a> {
-        use std::mem;
         const ATTRS: [VertexAttribute; 3] =
             wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x3, 2 => Float32x3];
         VertexBufferLayout {
@@ -174,17 +170,11 @@ impl Mesh {
     pub fn of_file(device: &Device, file: &str) -> Result<Self, Box<dyn Error>> {
         let obj_data = Data::from_file(file)?;
         let mut vertices: Vec<Vertex> = Vec::new();
-        let mut face_indices = Vec::new();
 
         let mut current_range = 0;
 
         for face in 0..obj_data.faces.len() {
             let face_data = Face::of_data(&obj_data, face);
-
-            face_indices.push((
-                current_range as u32,
-                (current_range + face_data.len()) as u32,
-            ));
 
             current_range += face_data.len();
 
@@ -217,7 +207,6 @@ impl Mesh {
 
         Ok(Self {
             vertices,
-            face_indices,
             total_vertices: current_range,
         })
     }

@@ -4,7 +4,11 @@ var<storage, read> automata_dim: vec3<u32>;
 
 @group(0)
 @binding(1)
-var<storage, read_write> automata_tensor: array<u32>;
+var<storage, read_write> input_tensor: array<u32>;
+
+@group(0)
+@binding(2)
+var<storage, read_write> output_tensor: array<u32>;
 
 fn neighbors(id: u32) -> u32 {
   // TODO: This can go out of bounds on 0 or dim indices, we should discard
@@ -22,7 +26,7 @@ fn neighbors(id: u32) -> u32 {
     for (var y: i32 = 0; y < 3; y += 1) { 
       let id: i32 = id + (Y_STRIDE * (y - 1));
       for (var x: i32 = 0; x < 3; x += 1) {
-        result += u32(automata_tensor[id]);
+        result += u32(input_tensor[id]);
       }
     }
   }
@@ -34,15 +38,15 @@ fn neighbors(id: u32) -> u32 {
 @workgroup_size(1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
-  let num_neighbors: u32 = neighbors(global_id.x);
+  let num_neighbors: u32 = neighbors(global_id.x) - input_tensor[global_id.x];
 
   var result: u32 = u32(0);
 
-  if num_neighbors < u32(13) {
+  if num_neighbors > u32(0) && num_neighbors < u32(5) {
     result = u32(1);
   } else {
     result = u32(0);
   };
 
-  automata_tensor[global_id.x] = result;
+  output_tensor[global_id.x] = result;
 }
