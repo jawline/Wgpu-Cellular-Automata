@@ -99,6 +99,31 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         label: None,
     });
 
+    // TODO: Regenerate on config change?
+    let texture_extent = wgpu::Extent3d {
+        width: config.width,
+        height: config.height,
+        depth_or_array_layers: 1,
+    };
+
+    let draw_depth_buffer = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Depth Buffer"),
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Depth32Float,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::RENDER_ATTACHMENT,
+    });
+let draw_depth_buffer_view = draw_depth_buffer.create_view(&wgpu::TextureViewDescriptor::default());
+
+    let depth_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("Depth Sampler"),
+        ..Default::default()
+    });
+
     let mesh_render_state = MeshRenderState::create(&device, &bind_group_layout, swapchain_format);
 
     let mut last_draw = Instant::now();
@@ -167,7 +192,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                                 store: true,
                             },
                         })],
-                        depth_stencil_attachment: None,
+                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                            view: &draw_depth_buffer_view,
+                            depth_ops: Some(wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(1.0),
+                                store: true,
+                            }),
+                            stencil_ops: None,
+                        }),
                     });
 
                     let projection = glam::Mat4::perspective_rh(

@@ -80,7 +80,7 @@ fn automata_id_to_offset(id: u32, automata_state: u32) -> vec4<f32> {
     let id: u32  = id % automata_dim.x;    
     let x = id;
 
-    if automata_state == 0u {
+    if automata_state == 5u {
       // TODO: I think there must be a better way of discarding
       return vec4<f32>(-9999999., -9999999., -999999., 0.);
     } else {
@@ -114,5 +114,5 @@ fn fs_main(
   @location(0) normal: vec3<f32>,
   @location(1) world_position: vec4<f32>,
   @location(2) texture_coordinate: vec3<f32>) -> @location(0) vec4<f32> {
-    return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+    return vec4<f32>(world_position.x, world_position.y, world_position.z, 1.0);
 }
