@@ -8,7 +8,7 @@ use wgpu::{
     RenderPass, RenderPipeline, TextureFormat,
 };
 
-const NUM_VERTICES_PER_BLOCK: u32 = 3;
+const NUM_VERTICES_PER_BLOCK: u32 = 24;
 
 pub struct Automata {
     pub dim: UVec3,
@@ -18,19 +18,13 @@ pub struct Automata {
     pub buffers: [Buffer; 2],
     pub bind_groups: Vec<BindGroup>,
     pub buffer_idx: usize,
-    pub staging_buffer: Buffer,
+    //pub staging_buffer: Buffer,
 }
 
 impl Automata {
     pub fn new(dim: &UVec3, device: &Device) -> Self {
         let initial_state: Vec<u32> = (0..(dim.x * dim.y * dim.z))
-            .map(|_| {
-                if rand::random::<f32>() <= 0.0001 {
-                    1
-                } else {
-                    0
-                }
-            })
+            .map(|_| if rand::random::<f32>() <= 0.3 { 1 } else { 0 })
             .collect();
 
         let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -43,12 +37,12 @@ impl Automata {
         let slice_size = initial_state.len() * std::mem::size_of::<u32>();
         let size = slice_size as wgpu::BufferAddress;
 
-        let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        /*let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
             size,
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
-        });
+        });*/
 
         let automata_dim_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Automata Tensor Dimensions"),
@@ -144,7 +138,7 @@ impl Automata {
             dim: *dim,
             dim_buffer: automata_dim_buffer,
             buffers: automata_buffers,
-            staging_buffer,
+            //staging_buffer,
             pipeline,
             bind_groups,
             buffer_idx: 0,
@@ -152,7 +146,7 @@ impl Automata {
         }
     }
 
-    pub fn update(&mut self, device: &Device, queue: &Queue) -> Vec<u32> {
+    pub fn update(&mut self, device: &Device, queue: &Queue) {
         let buffer_idx = self.buffer_idx;
         self.buffer_idx = (self.buffer_idx + 1) % 2;
 
@@ -170,29 +164,30 @@ impl Automata {
             cpass.dispatch_workgroups(self.size as u32, 1, 1);
         }
 
+        /*
         encoder.copy_buffer_to_buffer(
             output_buffer,
             0,
             &self.staging_buffer,
             0,
             self.size as u64 * mem::size_of::<u32>() as u64,
-        );
+        );*/
         queue.submit(Some(encoder.finish()));
 
-        let buffer_slice = self.staging_buffer.slice(..);
-        let (sender, receiver) = channel();
-        buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
+        //let buffer_slice = self.staging_buffer.slice(..);
+        //let (sender, receiver) = channel();
+        //buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
 
         // TODO: This is a busy poll for the final result. We don't actually need this on the GPU
         // so maybe just pass the buffer back to a shader instead?
-        device.poll(wgpu::Maintain::Wait);
-        receiver.recv().unwrap().unwrap();
+        //device.poll(wgpu::Maintain::Wait);
+        //receiver.recv().unwrap().unwrap();
 
-        let data = buffer_slice.get_mapped_range();
-        let result = bytemuck::cast_slice(&data).to_vec();
-        drop(data);
-        self.staging_buffer.unmap();
-        result
+        //let data = buffer_slice.get_mapped_range();
+        //let result = bytemuck::cast_slice(&data).to_vec();
+        //drop(data);
+        //self.staging_buffer.unmap();
+        //result
     }
 }
 

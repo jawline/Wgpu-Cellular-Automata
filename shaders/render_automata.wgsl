@@ -17,12 +17,57 @@ var<storage, read> automata_dim: vec3<u32>;
 @binding(1)
 var<storage, read> input_tensor: array<u32>;
 
-let NUM_VERTICES: u32 = 3u;
+let NUM_VERTICES: u32 = 24u;
 
 fn index_to_position(index: u32) -> vec4<f32> {
-    let x = f32(i32(index) - 1);
-    let y = f32(i32(index & 1u) * 2 - 1);
-    return vec4<f32>(x, y, 0.0, 1.0);
+    let triangle_id: u32 = index / 3u; 
+    let index = index % 3u;
+
+    var x: f32 = 0.;
+    var y: f32 = 0.;
+    var z: f32 = 0.;
+
+    if triangle_id == 0u {
+      // 0, 0
+      // 0, 1
+      // 1, 0
+      x = f32(i32(index / 2u));
+      y = f32(i32(index & 1u)); 
+      z = 0.;
+    } else if triangle_id == 1u {
+      // 1, 0
+      // 1, 1
+      // 0, 0
+      x = f32(1 - i32(index / 2u));
+      y = f32(i32(index >= 1u)); 
+      z = 0.;
+    } else if triangle_id == 2u {
+      x = f32(i32(index / 2u));
+      y = f32(i32(index & 1u)); 
+      z = 1.;
+    } else if triangle_id == 3u {
+      x = f32(1 - i32(index / 2u));
+      y = f32(i32(index >= 1u));
+      z = 1.;
+    } else if triangle_id == 4u {
+      x = f32(i32(index / 2u));
+      z = f32(i32(index & 1u)); 
+      y = 0.;
+    } else if triangle_id == 5u {
+      x = f32(1 - i32(index / 2u));
+      z = f32(i32(index >= 1u)); 
+      y = 0.;
+    } else if triangle_id == 6u {
+      x = f32(i32(index / 2u));
+      z = f32(i32(index & 1u)); 
+      y = 1.;
+    } else if triangle_id == 7u { 
+      x = f32(1 - i32(index / 2u));
+      z = f32(i32(index >= 1u)); 
+      y = 1.;
+    }
+
+    return vec4<f32>(x, y, z, 1.0);
 }
 
 fn automata_id_to_offset(id: u32, automata_state: u32) -> vec4<f32> {
@@ -30,9 +75,9 @@ fn automata_id_to_offset(id: u32, automata_state: u32) -> vec4<f32> {
     let z = id / automatas_in_layer;
 
     let id: u32 = id % automatas_in_layer;
-    let y = id / automata_dim.y;
+    let y = id / automata_dim.x;
 
-    let id: u32  = id % automata_dim.y;    
+    let id: u32  = id % automata_dim.x;    
     let x = id;
 
     if automata_state == 0u {
@@ -41,8 +86,7 @@ fn automata_id_to_offset(id: u32, automata_state: u32) -> vec4<f32> {
     } else {
       return vec4<f32>(f32(x), f32(y), f32(z), 1.0);
     }
-}
-    
+} 
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {

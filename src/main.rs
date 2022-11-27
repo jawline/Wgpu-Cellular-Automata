@@ -1,5 +1,8 @@
 mod automata;
 mod obj;
+mod polar;
+
+use std::f32::consts::PI;
 
 use automata::{Automata, AutomataRenderer};
 use rand::random;
@@ -15,6 +18,7 @@ use winit::{
 };
 
 use obj::{MeshInstance, MeshInstances, MeshRenderState};
+use polar::Polar;
 
 const FRAME_DELAY: Duration = Duration::new(0, 100000000);
 
@@ -104,6 +108,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let mut since_last_update = FRAME_DELAY;
 
+    let mut polar = Polar::new(20., 0., PI / 10.);
+
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
         // `event_loop.run` never returns, therefore we must do this to ensure
@@ -116,7 +122,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
+                println!("Resized");
                 // Reconfigure the surface with the new size
+                config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
                 // On macos the window needs to be redrawn manually after resizing
@@ -125,6 +133,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             Event::RedrawRequested(_) => {
                 let now = Instant::now();
                 let elapsed = now - last_draw;
+                polar.update(elapsed.as_secs_f32());
 
                 let frame = surface
                     .get_current_texture()
@@ -168,8 +177,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         100.,
                     );
 
+                    let (x, y) = polar.position();
+                    //println!("{} {}", x, y);
                     let view =
-                        Mat4::look_at_rh(Vec3::new(30., 30., 30.), Vec3::new(0., 0., 0.), Vec3::Z);
+                        Mat4::look_at_rh(Vec3::new(x, 10., y), Vec3::new(20., 20., 20.), Vec3::Z);
 
                     let projection_by_view = projection * view;
 
