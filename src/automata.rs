@@ -8,6 +8,8 @@ use wgpu::{
     RenderPass, RenderPipeline, TextureFormat,
 };
 
+const NUM_VERTICES_PER_BLOCK: u32 = 3;
+
 pub struct Automata {
     pub dim: UVec3,
     pub size: u32,
@@ -22,7 +24,13 @@ pub struct Automata {
 impl Automata {
     pub fn new(dim: &UVec3, device: &Device) -> Self {
         let initial_state: Vec<u32> = (0..(dim.x * dim.y * dim.z))
-            .map(|_| if rand::random::<f32>() <= 0.5 { 1 } else { 0 })
+            .map(|_| {
+                if rand::random::<f32>() <= 0.0001 {
+                    1
+                } else {
+                    0
+                }
+            })
             .collect();
 
         let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -277,7 +285,6 @@ impl AutomataRenderer {
             }),
             primitive: wgpu::PrimitiveState {
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
                 ..Default::default()
             },
             depth_stencil: /* TODO: Add a depth buffer */ None,
@@ -302,7 +309,7 @@ impl AutomataRenderer {
             &[],
         );
         pass.draw(
-            0..3, /* TODO: Sub in number of triangles per cube */
+            0..self.automata.size * NUM_VERTICES_PER_BLOCK, /* TODO: Sub in number of triangles per cube */
             0..1,
         );
     }

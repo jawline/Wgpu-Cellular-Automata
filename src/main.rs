@@ -154,7 +154,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                                 store: true,
                             },
                         })],
@@ -165,9 +165,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         90. * (std::f32::consts::PI / 180.),
                         config.width as f32 / config.height as f32,
                         1.,
-                        50.,
+                        100.,
                     );
-                    let view = Mat4::from_translation(Vec3::new(-20., -15., -30.));
+
+                    let view =
+                        Mat4::look_at_rh(Vec3::new(30., 30., 30.), Vec3::new(0., 0., 0.), Vec3::Z);
 
                     let projection_by_view = projection * view;
 

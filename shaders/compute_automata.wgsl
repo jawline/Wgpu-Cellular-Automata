@@ -42,7 +42,8 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
   var result: u32 = u32(0);
 
-  if num_neighbors > u32(0) && num_neighbors < u32(5) {
+  if /* (num_neighbors >= 6u && num_neighbors <= 8u)
+  || */ (num_neighbors >= 3u && num_neighbors <= 4u) {
     result = u32(1);
   } else {
     result = u32(0);
