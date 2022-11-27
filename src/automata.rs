@@ -1,8 +1,12 @@
 use glam::u32::UVec3;
-use std::mem;
 use std::borrow::Cow;
+use std::mem;
+use std::ops::Range;
 use std::sync::mpsc::channel;
-use wgpu::{util::DeviceExt, BindGroup, Buffer, ComputePipeline, Device, Queue};
+use wgpu::{
+    util::DeviceExt, BindGroup, BindGroupLayout, Buffer, ComputePipeline, Device, Queue,
+    RenderPass, RenderPipeline, TextureFormat,
+};
 
 pub struct Automata {
     pub dim: UVec3,
@@ -16,7 +20,6 @@ pub struct Automata {
 }
 
 impl Automata {
-    // TODO: Consider using two buffers to store the cells
     pub fn new(dim: &UVec3, device: &Device) -> Self {
         let initial_state: Vec<u32> = (0..(dim.x * dim.y * dim.z))
             .map(|_| if rand::random::<f32>() <= 0.5 { 1 } else { 0 })
@@ -128,6 +131,7 @@ impl Automata {
                 })
             })
             .collect();
+
         Self {
             dim: *dim,
             dim_buffer: automata_dim_buffer,
@@ -154,11 +158,17 @@ impl Automata {
                 encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
             cpass.set_pipeline(&self.pipeline);
             cpass.set_bind_group(0, bind_group, &[]);
-            cpass.insert_debug_marker("iterate automata");
+            cpass.insert_debug_marker("A single automata iteration");
             cpass.dispatch_workgroups(self.size as u32, 1, 1);
         }
 
-        encoder.copy_buffer_to_buffer(output_buffer, 0, &self.staging_buffer, 0, self.size  as u64 * mem::size_of::<u32>() as u64);
+        encoder.copy_buffer_to_buffer(
+            output_buffer,
+            0,
+            &self.staging_buffer,
+            0,
+            self.size as u64 * mem::size_of::<u32>() as u64,
+        );
         queue.submit(Some(encoder.finish()));
 
         let buffer_slice = self.staging_buffer.slice(..);
@@ -175,5 +185,72 @@ impl Automata {
         drop(data);
         self.staging_buffer.unmap();
         result
+    }
+}
+
+pub struct AutomataRenderer {
+    pub pipeline: RenderPipeline,
+    pub swapchain_format: TextureFormat,
+}
+
+impl AutomataRenderer {
+    pub fn new(
+        device: &Device,
+        bind_group_layout: &BindGroupLayout,
+        swapchain_format: TextureFormat,
+    ) -> Self {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: None,
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
+                "../shaders/render_automata.wgsl"
+            ))),
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[Some(swapchain_format.into())],
+            }),
+            primitive: wgpu::PrimitiveState {
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                ..Default::default()
+            },
+            depth_stencil: /* TODO: Add a depth buffer */ None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+        });
+
+        Self {
+            pipeline,
+            swapchain_format,
+        }
+    }
+
+    pub fn draw<'pass, 'automata: 'pass>(
+        &'automata self,
+        pass: &mut RenderPass<'pass>,
+        automata: &'automata Automata,
+    ) {
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(1, &automata.bind_groups[automata.buffer_idx], &[]);
+        pass.draw(
+            0..100, /* TODO: Sub in number of triangles per cube */
+            0..1,
+        );
     }
 }

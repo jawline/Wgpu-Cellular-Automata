@@ -1,7 +1,7 @@
 mod automata;
 mod obj;
 
-use automata::Automata;
+use automata::{Automata, AutomataRenderer};
 use rand::random;
 use std::time::{Duration, Instant};
 
@@ -16,7 +16,7 @@ use winit::{
 
 use obj::{MeshInstance, MeshInstances, MeshRenderState};
 
-const FRAME_DELAY: Duration = Duration::new(0, 250000000);
+const FRAME_DELAY: Duration = Duration::new(0, 100000000);
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let size = window.inner_size();
@@ -113,6 +113,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let mut last_draw = Instant::now();
     let mut automata = Automata::new(&UVec3::new(6, 6, 6), &device);
+    let automata_renderer = AutomataRenderer::new(&device, &bind_group_layout, swapchain_format);
 
     let mut since_last_update = FRAME_DELAY;
     let mut instance_id = 0;
@@ -195,6 +196,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         instance_id = 0;
 
                         let frame = automata.update(&device, &queue);
+                        automata_renderer.draw(&mut rpass, &automata);
                         println!("{:?}", frame);
                         cube_instances.update(&queue);
                     }
