@@ -249,7 +249,7 @@ impl AutomataRenderer {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(1, &automata.bind_groups[automata.buffer_idx], &[]);
         pass.draw(
-            0..100, /* TODO: Sub in number of triangles per cube */
+            0..3, /* TODO: Sub in number of triangles per cube */
             0..1,
         );
     }

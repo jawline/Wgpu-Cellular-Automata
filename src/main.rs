@@ -96,27 +96,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     let mesh_render_state = MeshRenderState::create(&device, &bind_group_layout, swapchain_format);
-    let mut cube_instances = MeshInstances::new(
-        (0..(20 * 20 * 20))
-            .map(|_| MeshInstance {
-                position: Vec3::new(
-                    random::<f32>() * 30.,
-                    random::<f32>() * 30.,
-                    random::<f32>() * 30.,
-                ),
-                rotation: Quat::IDENTITY,
-            })
-            .collect(),
-        &device,
-    );
-    let cube = obj::Mesh::of_file(&device, "./test_models/cube.obj").unwrap();
 
     let mut last_draw = Instant::now();
-    let mut automata = Automata::new(&UVec3::new(6, 6, 6), &device);
+    let mut automata = Automata::new(&UVec3::new(40, 40, 40), &device);
     let automata_renderer = AutomataRenderer::new(&device, &bind_group_layout, swapchain_format);
 
     let mut since_last_update = FRAME_DELAY;
-    let mut instance_id = 0;
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -131,7 +116,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 ..
             } => {
                 // Reconfigure the surface with the new size
-                config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
                 // On macos the window needs to be redrawn manually after resizing
@@ -144,9 +128,22 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 let frame = surface
                     .get_current_texture()
                     .expect("Failed to acquire next swap chain texture");
+
                 let view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
+
+                // If update delay has passed then use a compute
+                // pipeline to update the automata
+                since_last_update += elapsed;
+                if since_last_update >= FRAME_DELAY {
+                    since_last_update = Duration::new(0, 0);
+                    let frame = automata.update(&device, &queue);
+                    // TODO: Don't actually pull the frame back to the CPU unless
+                    // we really need to.
+                    //println!("{:?}", frame);
+                }
+
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
                 {
@@ -178,35 +175,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         0,
                         bytemuck::cast_slice(projection_by_view.as_ref()),
                     );
+
                     rpass.set_bind_group(0, &bind_group, &[]);
-
-                    // TODO: This makes me sad, I can't figure out how to pass a reference to cube
-                    // in that lasts sufficiently long to draw the rpass
-                    // I think I can refactor cube into cube.prepare, update and draw to avoid
-                    // this?
-
-                    since_last_update += elapsed;
-                    if since_last_update >= FRAME_DELAY {
-                        since_last_update = Duration::new(0, 0);
-
-                        for instance in &mut cube_instances.instances {
-                            instance.position.x = -50000.;
-                        }
-
-                        instance_id = 0;
-
-                        let frame = automata.update(&device, &queue);
-                        automata_renderer.draw(&mut rpass, &automata);
-                        println!("{:?}", frame);
-                        cube_instances.update(&queue);
-                    }
-
-                    cube.draw(
-                        &mut rpass,
-                        &mesh_render_state,
-                        &cube_instances,
-                        0..instance_id as u32,
-                    );
+                    automata_renderer.draw(&mut rpass, &automata);
                 }
 
                 queue.submit(Some(encoder.finish()));
