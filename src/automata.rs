@@ -191,6 +191,8 @@ impl Automata {
 pub struct AutomataRenderer {
     pub pipeline: RenderPipeline,
     pub swapchain_format: TextureFormat,
+    pub bind_groups: Vec<BindGroup>,
+    pub automata: Automata,
 }
 
 impl AutomataRenderer {
@@ -198,6 +200,7 @@ impl AutomataRenderer {
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         swapchain_format: TextureFormat,
+        automata: Automata,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
@@ -206,11 +209,58 @@ impl AutomataRenderer {
             ))),
         });
 
+        let uvec3_layout = |i| wgpu::BindGroupLayoutEntry {
+            binding: i,
+            visibility: wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: wgpu::BufferSize::new(12),
+            },
+            count: None,
+        };
+
+        let tensor_layout = |i| wgpu::BindGroupLayoutEntry {
+            binding: i,
+            visibility: wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: wgpu::BufferSize::new(automata.size as u64),
+            },
+            count: None,
+        };
+
+        let automata_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: &[uvec3_layout(0), tensor_layout(1)],
+            });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[&bind_group_layout, &automata_bind_group_layout],
             push_constant_ranges: &[],
         });
+
+        let bind_groups: Vec<BindGroup> = (0..2)
+            .map(|offset| {
+                device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout: &automata_bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: automata.dim_buffer.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: automata.buffers[(offset + 1) % 2].as_entire_binding(),
+                        },
+                    ],
+                })
+            })
+            .collect();
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
@@ -236,18 +286,21 @@ impl AutomataRenderer {
         });
 
         Self {
+            automata,
             pipeline,
             swapchain_format,
+            bind_groups,
         }
     }
 
-    pub fn draw<'pass, 'automata: 'pass>(
-        &'automata self,
-        pass: &mut RenderPass<'pass>,
-        automata: &'automata Automata,
-    ) {
+    pub fn draw<'pass, 'automata: 'pass>(&'automata self, pass: &mut RenderPass<'pass>) {
         pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(1, &automata.bind_groups[automata.buffer_idx], &[]);
+        pass.set_bind_group(
+            1,
+            /* TODO: This indexing is pretty awkward */
+            &self.bind_groups[self.automata.buffer_idx],
+            &[],
+        );
         pass.draw(
             0..3, /* TODO: Sub in number of triangles per cube */
             0..1,

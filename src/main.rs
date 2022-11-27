@@ -99,7 +99,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let mut last_draw = Instant::now();
     let mut automata = Automata::new(&UVec3::new(40, 40, 40), &device);
-    let automata_renderer = AutomataRenderer::new(&device, &bind_group_layout, swapchain_format);
+    let mut automata_renderer =
+        AutomataRenderer::new(&device, &bind_group_layout, swapchain_format, automata);
 
     let mut since_last_update = FRAME_DELAY;
 
@@ -138,7 +139,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 since_last_update += elapsed;
                 if since_last_update >= FRAME_DELAY {
                     since_last_update = Duration::new(0, 0);
-                    let frame = automata.update(&device, &queue);
+                    let frame = automata_renderer.automata.update(&device, &queue);
                     // TODO: Don't actually pull the frame back to the CPU unless
                     // we really need to.
                     //println!("{:?}", frame);
@@ -177,7 +178,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     );
 
                     rpass.set_bind_group(0, &bind_group, &[]);
-                    automata_renderer.draw(&mut rpass, &automata);
+                    automata_renderer.draw(&mut rpass);
                 }
 
                 queue.submit(Some(encoder.finish()));
