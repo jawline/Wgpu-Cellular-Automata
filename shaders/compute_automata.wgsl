@@ -54,7 +54,7 @@ fn main(@builtin(global_invocation_id) pos: vec3<u32>) {
       result = 1u;
     }
   } else {
-    if num_neighbors == 9u {
+    if num_neighbors == 8u {
       result = 1u;
     }
   }

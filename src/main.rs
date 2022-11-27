@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use glam::{u32::UVec3, Mat4, Quat, Vec3};
 
-use wgpu::{Texture, Device, Buffer, TextureView, util::DeviceExt};
+use wgpu::{util::DeviceExt, Buffer, Device, Texture, TextureView};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -20,10 +20,12 @@ use winit::{
 use obj::{MeshInstance, MeshInstances, MeshRenderState};
 use polar::Polar;
 
-const FRAME_DELAY: Duration = Duration::new(0, 100000000);
+const FRAME_DELAY: Duration = Duration::new(0, 400000000);
 
-fn generate_depth_buffer(device: &Device, config: &wgpu::SurfaceConfiguration) -> (Texture, TextureView) {
-
+fn generate_depth_buffer(
+    device: &Device,
+    config: &wgpu::SurfaceConfiguration,
+) -> (Texture, TextureView) {
     let texture_extent = wgpu::Extent3d {
         width: config.width,
         height: config.height,
@@ -41,7 +43,8 @@ fn generate_depth_buffer(device: &Device, config: &wgpu::SurfaceConfiguration) -
             | wgpu::TextureUsages::COPY_DST
             | wgpu::TextureUsages::RENDER_ATTACHMENT,
     });
-    let draw_depth_buffer_view = draw_depth_buffer.create_view(&wgpu::TextureViewDescriptor::default());
+    let draw_depth_buffer_view =
+        draw_depth_buffer.create_view(&wgpu::TextureViewDescriptor::default());
     (draw_depth_buffer, draw_depth_buffer_view)
 }
 
@@ -122,7 +125,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         label: None,
     });
 
-    let (mut draw_depth_buffer, mut draw_depth_buffer_view) = generate_depth_buffer(&device, &config);
+    let (mut draw_depth_buffer, mut draw_depth_buffer_view) =
+        generate_depth_buffer(&device, &config);
 
     let depth_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("Depth Sampler"),
@@ -157,7 +161,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
-                (draw_depth_buffer, draw_depth_buffer_view) = generate_depth_buffer(&device, &config);
+                (draw_depth_buffer, draw_depth_buffer_view) =
+                    generate_depth_buffer(&device, &config);
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
             }
