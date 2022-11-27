@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use glam::{u32::UVec3, Mat4, Quat, Vec3};
 
-use wgpu::util::DeviceExt;
+use wgpu::{Texture, Device, Buffer, TextureView, util::DeviceExt};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -21,6 +21,29 @@ use obj::{MeshInstance, MeshInstances, MeshRenderState};
 use polar::Polar;
 
 const FRAME_DELAY: Duration = Duration::new(0, 100000000);
+
+fn generate_depth_buffer(device: &Device, config: &wgpu::SurfaceConfiguration) -> (Texture, TextureView) {
+
+    let texture_extent = wgpu::Extent3d {
+        width: config.width,
+        height: config.height,
+        depth_or_array_layers: 1,
+    };
+
+    let draw_depth_buffer = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Depth Buffer"),
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Depth32Float,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::RENDER_ATTACHMENT,
+    });
+    let draw_depth_buffer_view = draw_depth_buffer.create_view(&wgpu::TextureViewDescriptor::default());
+    (draw_depth_buffer, draw_depth_buffer_view)
+}
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let size = window.inner_size();
@@ -99,25 +122,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         label: None,
     });
 
-    // TODO: Regenerate on config change?
-    let texture_extent = wgpu::Extent3d {
-        width: config.width,
-        height: config.height,
-        depth_or_array_layers: 1,
-    };
-
-    let draw_depth_buffer = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Depth Buffer"),
-        size: texture_extent,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Depth32Float,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING
-            | wgpu::TextureUsages::COPY_DST
-            | wgpu::TextureUsages::RENDER_ATTACHMENT,
-    });
-let draw_depth_buffer_view = draw_depth_buffer.create_view(&wgpu::TextureViewDescriptor::default());
+    let (mut draw_depth_buffer, mut draw_depth_buffer_view) = generate_depth_buffer(&device, &config);
 
     let depth_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("Depth Sampler"),
@@ -152,6 +157,7 @@ let draw_depth_buffer_view = draw_depth_buffer.create_view(&wgpu::TextureViewDes
                 config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
+                (draw_depth_buffer, draw_depth_buffer_view) = generate_depth_buffer(&device, &config);
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
             }

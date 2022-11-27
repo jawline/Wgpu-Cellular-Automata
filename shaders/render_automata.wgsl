@@ -80,7 +80,7 @@ fn automata_id_to_offset(id: u32, automata_state: u32) -> vec4<f32> {
     let id: u32  = id % automata_dim.x;    
     let x = id;
 
-    if automata_state == 5u {
+    if automata_state == 0u {
       // TODO: I think there must be a better way of discarding
       return vec4<f32>(-9999999., -9999999., -999999., 0.);
     } else {
