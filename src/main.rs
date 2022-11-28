@@ -12,7 +12,7 @@ use glam::{u32::UVec3, Mat4, Quat, Vec3};
 
 use wgpu::{util::DeviceExt, Buffer, Device, Texture, TextureView};
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
@@ -20,7 +20,7 @@ use winit::{
 use obj::{MeshInstance, MeshInstances, MeshRenderState};
 use polar::Polar;
 
-const FRAME_DELAY: Duration = Duration::new(0, 400000000);
+const FRAME_DELAY: Duration = Duration::new(0, 100000000);
 
 fn generate_depth_buffer(
     device: &Device,
@@ -136,13 +136,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mesh_render_state = MeshRenderState::create(&device, &bind_group_layout, swapchain_format);
 
     let mut last_draw = Instant::now();
-    let mut automata = Automata::new(&UVec3::new(40, 40, 40), &device);
-    let mut automata_renderer =
-        AutomataRenderer::new(&device, &bind_group_layout, swapchain_format, automata);
+    let mut automata_renderer = AutomataRenderer::new(
+        &device,
+        &bind_group_layout,
+        swapchain_format,
+        Automata::new(&UVec3::new(40, 40, 40), &device),
+    );
 
     let mut since_last_update = FRAME_DELAY;
 
-    let mut polar = Polar::new(20., 0., PI / 10.);
+    let mut polar = Polar::new(20., 0., PI / 40.);
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -165,6 +168,26 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     generate_depth_buffer(&device, &config);
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            winit::event::KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::R),
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => {
+                // On 'R' reset the automata
+                automata_renderer = AutomataRenderer::new(
+                    &device,
+                    &bind_group_layout,
+                    swapchain_format,
+                    Automata::new(&UVec3::new(40, 40, 40), &device),
+                );
             }
             Event::RedrawRequested(_) => {
                 let now = Instant::now();
@@ -222,8 +245,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                     let (x, y) = polar.position();
                     //println!("{} {}", x, y);
-                    let view =
-                        Mat4::look_at_rh(Vec3::new(x, 10., y), Vec3::new(20., 20., 20.), Vec3::Z);
+                    let view = Mat4::look_at_rh(
+                        Vec3::new(x + 10., y + 10., 10.),
+                        Vec3::new(10., 10., 10.),
+                        Vec3::Z,
+                    );
 
                     let projection_by_view = projection * view;
 

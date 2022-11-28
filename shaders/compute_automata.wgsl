@@ -50,7 +50,7 @@ fn main(@builtin(global_invocation_id) pos: vec3<u32>) {
   var result: u32 = 0u;
 
   if currently_alive {
-    if (num_neighbors >= 7u && num_neighbors <= 14u) {
+    if (num_neighbors >= 8u && num_neighbors <= 14u) {
       result = 1u;
     }
   } else {

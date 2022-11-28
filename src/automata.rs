@@ -24,7 +24,7 @@ pub struct Automata {
 impl Automata {
     pub fn new(dim: &UVec3, device: &Device) -> Self {
         let initial_state: Vec<u32> = (0..(dim.x * dim.y * dim.z))
-            .map(|_| if rand::random::<f32>() <= 0.2 { 1 } else { 0 })
+            .map(|_| if rand::random::<f32>() <= 0.3 { 1 } else { 0 })
             .collect();
 
         let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
