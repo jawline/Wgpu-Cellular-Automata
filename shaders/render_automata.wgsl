@@ -17,7 +17,7 @@ var<storage, read> automata_dim: vec3<u32>;
 @binding(1)
 var<storage, read> input_tensor: array<u32>;
 
-let NUM_VERTICES: u32 = 24u;
+let NUM_VERTICES: u32 = 36u;
 
 fn index_to_position(index: u32) -> vec4<f32> {
     let triangle_id: u32 = index / 3u; 
@@ -65,6 +65,22 @@ fn index_to_position(index: u32) -> vec4<f32> {
       x = f32(1 - i32(index / 2u));
       z = f32(i32(index >= 1u)); 
       y = 1.;
+    } else if triangle_id == 8u {
+      y = f32(i32(index / 2u));
+      z = f32(i32(index & 1u)); 
+      x = 0.;
+    } else if triangle_id == 9u { 
+      y = f32(1 - i32(index / 2u));
+      z = f32(i32(index >= 1u)); 
+      x = 0.;
+    } else if triangle_id == 10u {
+      y = f32(i32(index / 2u));
+      z = f32(i32(index & 1u)); 
+      x = 1.;
+    } else if triangle_id == 11u { 
+      y = f32(1 - i32(index / 2u));
+      z = f32(i32(index >= 1u)); 
+      x = 1.;
     }
 
     return vec4<f32>(x, y, z, 1.0);

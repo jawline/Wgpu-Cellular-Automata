@@ -8,7 +8,7 @@ use wgpu::{
     RenderPass, RenderPipeline, TextureFormat,
 };
 
-const NUM_VERTICES_PER_BLOCK: u32 = 24;
+const NUM_VERTICES_PER_BLOCK: u32 = 36;
 
 pub struct Automata {
     pub dim: UVec3,
