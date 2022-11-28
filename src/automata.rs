@@ -123,7 +123,7 @@ impl Automata {
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
-                            resource: automata_buffers[(offset + 1) % 2].as_entire_binding(),
+                            resource: automata_buffers[offset].as_entire_binding(),
                         },
                         wgpu::BindGroupEntry {
                             binding: 2,
