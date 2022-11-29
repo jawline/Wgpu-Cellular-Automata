@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use glam::{u32::UVec3, Mat4, Quat, Vec3};
 
-use wgpu::{util::DeviceExt, Buffer, Device, Texture, TextureView};
+use wgpu::{util::DeviceExt, Buffer, Device, Texture, TextureView, BindGroupLayout, TextureFormat};
 use winit::{
     event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -20,7 +20,21 @@ use winit::{
 use obj::{MeshInstance, MeshInstances, MeshRenderState};
 use polar::Polar;
 
-const FRAME_DELAY: Duration = Duration::new(0, 100000000);
+const FRAME_DELAY: Duration = Duration::new(0, 400000000);
+
+fn fresh_automata(
+    device: &Device,
+    bind_group_layout: &BindGroupLayout,
+    swapchain_format: TextureFormat,
+    dim: UVec3,
+) -> AutomataRenderer {
+    AutomataRenderer::new(
+        &device,
+        &bind_group_layout,
+        swapchain_format,
+        Automata::new(&dim, &device),
+    )
+}
 
 fn generate_depth_buffer(
     device: &Device,
@@ -136,16 +150,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mesh_render_state = MeshRenderState::create(&device, &bind_group_layout, swapchain_format);
 
     let mut last_draw = Instant::now();
-    let mut automata_renderer = AutomataRenderer::new(
-        &device,
-        &bind_group_layout,
-        swapchain_format,
-        Automata::new(&UVec3::new(40, 40, 40), &device),
-    );
+    let half_dim = 40;
+    let automata_dim = UVec3::new(half_dim * 2, half_dim * 2, half_dim * 2);
+    let mut automata_renderer = fresh_automata(&device, &bind_group_layout, swapchain_format, automata_dim);
 
     let mut since_last_update = FRAME_DELAY;
 
-    let mut polar = Polar::new(20., 0., PI / 40.);
+    let mut polar = Polar::new((half_dim + 10) as f32, 0., PI / 40.);
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -159,13 +170,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                println!("Resized");
+
                 // Reconfigure the surface with the new size
                 config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
+
                 (draw_depth_buffer, draw_depth_buffer_view) =
                     generate_depth_buffer(&device, &config);
+
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
             }
@@ -182,12 +195,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 ..
             } => {
                 // On 'R' reset the automata
-                automata_renderer = AutomataRenderer::new(
-                    &device,
-                    &bind_group_layout,
-                    swapchain_format,
-                    Automata::new(&UVec3::new(40, 40, 40), &device),
-                );
+                automata_renderer = fresh_automata(&device, &bind_group_layout, swapchain_format, automata_dim);
             }
             Event::RedrawRequested(_) => {
                 let now = Instant::now();
@@ -239,8 +247,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     let projection = glam::Mat4::perspective_rh(
                         90. * (std::f32::consts::PI / 180.),
                         config.width as f32 / config.height as f32,
-                        1.,
-                        100.,
+                        0.1,
+                        150.,
                     );
 
                     let (x, y) = polar.position();

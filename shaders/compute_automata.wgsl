@@ -4,10 +4,14 @@ var<storage, read> automata_dim: vec3<u32>;
 
 @group(0)
 @binding(1)
-var<storage, read_write> input_tensor: array<u32>;
+var<storage, read> compute_offset: vec3<u32>;
 
 @group(0)
 @binding(2)
+var<storage, read_write> input_tensor: array<u32>;
+
+@group(0)
+@binding(3)
 var<storage, read_write> output_tensor: array<u32>;
 
 fn xyz_to_id(xyz: vec3<u32>) -> u32 {
@@ -41,6 +45,7 @@ fn neighbors(offset: vec3<u32>) -> u32 {
 @compute
 @workgroup_size(1)
 fn main(@builtin(global_invocation_id) pos: vec3<u32>) {
+  let pos: vec3<u32> = pos + compute_offset;
 
   let id: u32 = xyz_to_id(pos);
 

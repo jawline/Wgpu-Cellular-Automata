@@ -9,22 +9,23 @@ use wgpu::{
 };
 
 const NUM_VERTICES_PER_BLOCK: u32 = 36;
+const MAX_DIM_PER_COMPUTE_JOB: UVec3 = UVec3::new(40, 40, 40);
 
 pub struct Automata {
     pub dim: UVec3,
     pub size: u32,
     pub pipeline: ComputePipeline,
     pub dim_buffer: Buffer,
+    pub compute_offset_buffer: Buffer,
     pub buffers: [Buffer; 2],
     pub bind_groups: Vec<BindGroup>,
     pub buffer_idx: usize,
-    //pub staging_buffer: Buffer,
 }
 
 impl Automata {
     pub fn new(dim: &UVec3, device: &Device) -> Self {
         let initial_state: Vec<u32> = (0..(dim.x * dim.y * dim.z))
-            .map(|_| if rand::random::<f32>() <= 0.3 { 1 } else { 0 })
+            .map(|_| if rand::random::<f32>() <= 0.1 { 1 } else { 0 })
             .collect();
 
         let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -37,16 +38,17 @@ impl Automata {
         let slice_size = initial_state.len() * std::mem::size_of::<u32>();
         let size = slice_size as wgpu::BufferAddress;
 
-        /*let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size,
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });*/
-
         let automata_dim_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Automata Tensor Dimensions"),
             contents: bytemuck::cast_slice(dim.as_ref()),
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+        });
+
+        let compute_offset_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Automata Tensor Dimensions"),
+            contents: bytemuck::cast_slice(UVec3::new(0, 0, 0).as_ref()),
             usage: wgpu::BufferUsages::STORAGE
                 | wgpu::BufferUsages::COPY_DST
                 | wgpu::BufferUsages::COPY_SRC,
@@ -93,7 +95,12 @@ impl Automata {
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
-            entries: &[uvec3_layout(0), tensor_layout(1), tensor_layout(2)],
+            entries: &[
+                uvec3_layout(0),
+                uvec3_layout(1),
+                tensor_layout(2),
+                tensor_layout(3),
+            ],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -123,10 +130,14 @@ impl Automata {
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
-                            resource: automata_buffers[offset].as_entire_binding(),
+                            resource: compute_offset_buffer.as_entire_binding(),
                         },
                         wgpu::BindGroupEntry {
                             binding: 2,
+                            resource: automata_buffers[offset].as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
                             resource: automata_buffers[(offset + 1) % 2].as_entire_binding(),
                         },
                     ],
@@ -137,8 +148,8 @@ impl Automata {
         Self {
             dim: *dim,
             dim_buffer: automata_dim_buffer,
+            compute_offset_buffer,
             buffers: automata_buffers,
-            //staging_buffer,
             pipeline,
             bind_groups,
             buffer_idx: 0,
@@ -160,34 +171,27 @@ impl Automata {
                 encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
             cpass.set_pipeline(&self.pipeline);
             cpass.set_bind_group(0, bind_group, &[]);
-            cpass.insert_debug_marker("A single automata iteration");
-            cpass.dispatch_workgroups(self.dim.x as u32, self.dim.y as u32, self.dim.z as u32);
+
+            for z_offset in (0..self.dim.z).step_by(MAX_DIM_PER_COMPUTE_JOB.z as usize) {
+                for y_offset in (0..self.dim.y).step_by(MAX_DIM_PER_COMPUTE_JOB.y as usize) {
+                    for x_offset in (0..self.dim.x).step_by(MAX_DIM_PER_COMPUTE_JOB.x as usize) {
+                        cpass.insert_debug_marker("A single automata iteration");
+                        queue.write_buffer(
+                            &self.compute_offset_buffer,
+                            0,
+                            bytemuck::cast_slice(UVec3::new(x_offset, y_offset, z_offset).as_ref()),
+                        );
+                        cpass.dispatch_workgroups(
+                            std::cmp::max(self.dim.x, MAX_DIM_PER_COMPUTE_JOB.x) as u32,
+                            std::cmp::max(self.dim.x, MAX_DIM_PER_COMPUTE_JOB.y) as u32,
+                            std::cmp::max(self.dim.x, MAX_DIM_PER_COMPUTE_JOB.z) as u32,
+                        );
+                    }
+                }
+            }
         }
 
-        /*
-        encoder.copy_buffer_to_buffer(
-            output_buffer,
-            0,
-            &self.staging_buffer,
-            0,
-            self.size as u64 * mem::size_of::<u32>() as u64,
-        );*/
         queue.submit(Some(encoder.finish()));
-
-        //let buffer_slice = self.staging_buffer.slice(..);
-        //let (sender, receiver) = channel();
-        //buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
-
-        // TODO: This is a busy poll for the final result. We don't actually need this on the GPU
-        // so maybe just pass the buffer back to a shader instead?
-        //device.poll(wgpu::Maintain::Wait);
-        //receiver.recv().unwrap().unwrap();
-
-        //let data = buffer_slice.get_mapped_range();
-        //let result = bytemuck::cast_slice(&data).to_vec();
-        //drop(data);
-        //self.staging_buffer.unmap();
-        //result
     }
 }
 
