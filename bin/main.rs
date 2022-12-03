@@ -14,17 +14,6 @@ use winit::{
 
 const FRAME_DELAY: Duration = Duration::new(0, 100000000);
 
-fn conways_game_of_life() -> Statement {
-    if_then_else(
-        alive(),
-        set_result(or(
-            equal(neighbors(), const_u32(2)),
-            equal(neighbors(), const_u32(3)),
-        )),
-        set_result(equal(neighbors(), const_u32(3))),
-    )
-}
-
 fn fresh_automata(
     device: &Device,
     bind_group_layout: &BindGroupLayout,
@@ -111,7 +100,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     surface.configure(&device, &config);
 
-    // TODO: Move this bind group logic to its own home
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
         entries: &[wgpu::BindGroupLayoutEntry {
@@ -147,9 +135,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let (_, mut draw_depth_buffer_view) = generate_depth_buffer(&device, &config);
 
     let mut last_draw = Instant::now();
-    let half_dim = 250;
-    let automata_dim = UVec3::new(half_dim * 2, half_dim * 2, 3);
-    let automata_p = 0.05;
+    let automata_dim = UVec3::new(100, 100, 5);
+    let automata_p = 0.005;
     let automata_rules = conways_game_of_life();
 
     let mut automata_renderer = fresh_automata(
@@ -167,9 +154,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut y_off = 0.;
 
     event_loop.run(move |event, _, control_flow| {
-        // Have the closure take ownership of the resources.
-        // `event_loop.run` never returns, therefore we must do this to ensure
-        // the resources are properly cleaned up.
         let _ = (&instance, &adapter, &pipeline_layout);
 
         *control_flow = ControlFlow::Wait;
@@ -178,14 +162,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                // Reconfigure the surface with the new size
                 config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
-
                 (_, draw_depth_buffer_view) = generate_depth_buffer(&device, &config);
-
-                // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
             }
             Event::WindowEvent {
@@ -313,7 +293,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     });
 
                     let projection = glam::Mat4::perspective_rh(
-                        90. * (std::f32::consts::PI / 180.),
+                        70. * (std::f32::consts::PI / 180.),
                         config.width as f32 / config.height as f32,
                         0.1,
                         1500.,
@@ -355,7 +335,6 @@ fn main() {
     #[cfg(not(target_arch = "wasm32"))]
     {
         env_logger::init();
-        // Temporarily avoid srgb formats for the swapchain on the web
         pollster::block_on(run(event_loop, window));
     }
     #[cfg(target_arch = "wasm32")]
@@ -363,7 +342,6 @@ fn main() {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init().expect("could not initialize logger");
         use winit::platform::web::WindowExtWebSys;
-        // On wasm, append the canvas to the document body
         web_sys::window()
             .and_then(|win| win.document())
             .and_then(|doc| doc.body())

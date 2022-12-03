@@ -23,17 +23,18 @@ pub struct Automata {
 
 impl Automata {
     pub fn new(dim: &UVec3, p: f32, dsl: crate::automata_dsl::Statement, device: &Device) -> Self {
+
         let initial_state: Vec<u32> = (0..(dim.x * dim.y * dim.z))
             .map(|_| if rand::random::<f32>() <= p { 1 } else { 0 })
             .collect();
 
         let shader_rules = dsl.to_shader();
 
-        info!("Shader code: {}", shader_rules);
-
         let shader = include_str!("../shaders/compute_automata.wgsl")
             .to_string()
             .replace("PLACEHOLDER", &shader_rules);
+
+        info!("Shader code: {}", shader_rules);
 
         let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
@@ -82,7 +83,7 @@ impl Automata {
             ty: wgpu::BindingType::Buffer {
                 ty: wgpu::BufferBindingType::Storage { read_only: true },
                 has_dynamic_offset: false,
-                min_binding_size: wgpu::BufferSize::new(12),
+                min_binding_size: wgpu::BufferSize::new((std::mem::size_of::<f32>() * 3) as u64),
             },
             count: None,
         };
@@ -109,13 +110,13 @@ impl Automata {
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("automata pipeline layout"),
+            label: Some("Automata pipeline layout"),
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: None,
+            label: Some("Automata compute pipeline"),
             layout: Some(&pipeline_layout),
             module: &cs_module,
             entry_point: "main",
@@ -185,7 +186,6 @@ impl Automata {
                     encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
                 cpass.set_pipeline(&self.pipeline);
                 cpass.set_bind_group(0, bind_group, &[]);
-                cpass.insert_debug_marker("A single automata iteration");
                 let id = min(step_size, dim_size - offset);
                 cpass.dispatch_workgroups(id, 1, 1);
             }
@@ -308,9 +308,8 @@ impl AutomataRenderer {
     pub fn draw<'pass, 'automata: 'pass>(&'automata self, pass: &mut RenderPass<'pass>) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(1, &self.bind_groups[self.automata.iteration % 2], &[]);
-
         pass.draw(
-            0..self.automata.size * NUM_VERTICES_PER_BLOCK, /* TODO: Sub in number of triangles per cube */
+            0..self.automata.size * NUM_VERTICES_PER_BLOCK,
             0..1,
         );
     }

@@ -142,3 +142,14 @@ pub fn if_then_else(
         if_false_then: Box::new(if_false_then),
     }
 }
+
+pub fn conways_game_of_life() -> Statement {
+    if_then_else(
+        alive(),
+        set_result(or(
+            equal(neighbors(), const_u32(2)),
+            equal(neighbors(), const_u32(3)),
+        )),
+        set_result(equal(neighbors(), const_u32(3))),
+    )
+}

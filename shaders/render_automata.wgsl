@@ -136,5 +136,5 @@ fn fs_main(
   @location(0) normal: vec3<f32>,
   @location(1) world_position: vec4<f32>,
   @location(2) texture_coordinate: vec4<f32>) -> @location(0) vec4<f32> {
-    return vec4<f32>(texture_coordinate.x, texture_coordinate.y, texture_coordinate.z, 1.0);
+    return vec4<f32>(texture_coordinate.x * 0.9, texture_coordinate.y * 0.9, texture_coordinate.z * 0.9, 1.0);
 }
