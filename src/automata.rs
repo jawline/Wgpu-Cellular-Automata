@@ -1,13 +1,14 @@
 use glam::u32::UVec3;
 use log::info;
 use std::borrow::Cow;
+use std::cmp::min;
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayout, Buffer, ComputePipeline, Device, Queue,
     RenderPass, RenderPipeline, TextureFormat,
 };
 
 const NUM_VERTICES_PER_BLOCK: u32 = 36;
-const MAX_DIM_PER_COMPUTE_JOB: UVec3 = UVec3::new(40, 40, 40);
+const MAX_COMPUTE_PER_SHADER: u32 = 65535;
 
 pub struct Automata {
     pub dim: UVec3,
@@ -152,8 +153,8 @@ impl Automata {
         Self {
             dim: *dim,
             dim_buffer: automata_dim_buffer,
-            compute_offset_buffer,
             buffers: automata_buffers,
+            compute_offset_buffer,
             pipeline,
             bind_groups,
             iteration: 0,
@@ -167,32 +168,29 @@ impl Automata {
 
         let bind_group = &self.bind_groups[bind_group];
 
-        for z_offset in (0..self.dim.z).step_by(MAX_DIM_PER_COMPUTE_JOB.z as usize) {
-            for y_offset in (0..self.dim.y).step_by(MAX_DIM_PER_COMPUTE_JOB.y as usize) {
-                for x_offset in (0..self.dim.x).step_by(MAX_DIM_PER_COMPUTE_JOB.x as usize) {
-                    queue.write_buffer(
-                        &self.compute_offset_buffer,
-                        0,
-                        bytemuck::cast_slice(UVec3::new(x_offset, y_offset, z_offset).as_ref()),
-                    );
-                    let mut encoder = device
-                        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-                    {
-                        let mut cpass = encoder
-                            .begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
-                        cpass.set_pipeline(&self.pipeline);
-                        cpass.set_bind_group(0, bind_group, &[]);
-                        cpass.insert_debug_marker("A single automata iteration");
-                        cpass.dispatch_workgroups(
-                            std::cmp::max(self.dim.x, MAX_DIM_PER_COMPUTE_JOB.x) as u32,
-                            std::cmp::max(self.dim.x, MAX_DIM_PER_COMPUTE_JOB.y) as u32,
-                            std::cmp::max(self.dim.x, MAX_DIM_PER_COMPUTE_JOB.z) as u32,
-                        );
-                    }
+        let dim_size = self.dim.x * self.dim.y * self.dim.z;
+        let step_size = min(dim_size, MAX_COMPUTE_PER_SHADER);
 
-                    queue.submit(Some(encoder.finish()));
-                }
+        for offset in (0..dim_size as usize).step_by(step_size as usize) {
+            let offset = offset as u32;
+            queue.write_buffer(
+                &self.compute_offset_buffer,
+                0,
+                bytemuck::cast_slice(UVec3::new(offset, 0, 0).as_ref()),
+            );
+            let mut encoder =
+                device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            {
+                let mut cpass =
+                    encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
+                cpass.set_pipeline(&self.pipeline);
+                cpass.set_bind_group(0, bind_group, &[]);
+                cpass.insert_debug_marker("A single automata iteration");
+                let id = min(step_size, dim_size - offset);
+                cpass.dispatch_workgroups(id, 1, 1);
             }
+
+            queue.submit(Some(encoder.finish()));
         }
     }
 }

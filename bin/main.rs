@@ -147,7 +147,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let (_, mut draw_depth_buffer_view) = generate_depth_buffer(&device, &config);
 
     let mut last_draw = Instant::now();
-    let half_dim = 60;
+    let half_dim = 250;
     let automata_dim = UVec3::new(half_dim * 2, half_dim * 2, 3);
     let automata_p = 0.05;
     let automata_rules = conways_game_of_life();
@@ -163,6 +163,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let mut since_last_update = FRAME_DELAY;
     let mut x_rotation = 0.;
+    let mut x_off = 0.;
+    let mut y_off = 0.;
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -185,6 +187,63 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            winit::event::KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::W),
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => {
+                y_off -= 1.;
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            winit::event::KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::S),
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => {
+                y_off += 1.;
+            }
+
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            winit::event::KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::A),
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => {
+                x_off += 1.;
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            winit::event::KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::D),
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => {
+                x_off -= 1.;
             }
             Event::WindowEvent {
                 event:
@@ -257,11 +316,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         90. * (std::f32::consts::PI / 180.),
                         config.width as f32 / config.height as f32,
                         0.1,
-                        150.,
+                        1500.,
                     );
 
-                    let view = Mat4::from_translation(Vec3::new(0., 0., -60.));
-
+                    let view = Mat4::from_translation(Vec3::new(x_off, y_off, -100.));
                     let rotation = Mat4::from_rotation_y(x_rotation);
 
                     let projection_by_view = projection * view * rotation;
