@@ -1,38 +1,31 @@
-mod automata;
-mod obj;
-mod polar;
-
 use std::f32::consts::PI;
 
-use automata::{Automata, AutomataRenderer};
-use rand::random;
+use automata_lib::{Automata, AutomataRenderer};
 use std::time::{Duration, Instant};
 
-use glam::{u32::UVec3, Mat4, Quat, Vec3};
+use glam::{u32::UVec3, Mat4, Vec3};
 
-use wgpu::{util::DeviceExt, Buffer, Device, Texture, TextureView, BindGroupLayout, TextureFormat};
+use wgpu::{util::DeviceExt, BindGroupLayout, Device, Texture, TextureFormat, TextureView};
 use winit::{
-    event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{Event, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
 
-use obj::{MeshInstance, MeshInstances, MeshRenderState};
-use polar::Polar;
-
-const FRAME_DELAY: Duration = Duration::new(0, 400000000);
+const FRAME_DELAY: Duration = Duration::new(0, 100000000);
 
 fn fresh_automata(
     device: &Device,
     bind_group_layout: &BindGroupLayout,
     swapchain_format: TextureFormat,
     dim: UVec3,
+    p: f32,
 ) -> AutomataRenderer {
     AutomataRenderer::new(
         &device,
         &bind_group_layout,
         swapchain_format,
-        Automata::new(&dim, &device),
+        Automata::new(&dim, p, &device),
     )
 }
 
@@ -139,24 +132,22 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         label: None,
     });
 
-    let (mut draw_depth_buffer, mut draw_depth_buffer_view) =
-        generate_depth_buffer(&device, &config);
-
-    let depth_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-        label: Some("Depth Sampler"),
-        ..Default::default()
-    });
-
-    let mesh_render_state = MeshRenderState::create(&device, &bind_group_layout, swapchain_format);
+    let (_, mut draw_depth_buffer_view) = generate_depth_buffer(&device, &config);
 
     let mut last_draw = Instant::now();
-    let half_dim = 40;
-    let automata_dim = UVec3::new(half_dim * 2, half_dim * 2, half_dim * 2);
-    let mut automata_renderer = fresh_automata(&device, &bind_group_layout, swapchain_format, automata_dim);
+    let half_dim = 60;
+    let automata_dim = UVec3::new(half_dim * 2, half_dim * 2, 3);
+    let automata_p = 0.01;
+    let mut automata_renderer = fresh_automata(
+        &device,
+        &bind_group_layout,
+        swapchain_format,
+        automata_dim,
+        automata_p,
+    );
 
     let mut since_last_update = FRAME_DELAY;
-
-    let mut polar = Polar::new((half_dim + 10) as f32, 0., PI / 40.);
+    let mut x_rotation = 0.;
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -170,14 +161,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-
                 // Reconfigure the surface with the new size
                 config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
 
-                (draw_depth_buffer, draw_depth_buffer_view) =
-                    generate_depth_buffer(&device, &config);
+                (_, draw_depth_buffer_view) = generate_depth_buffer(&device, &config);
 
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
@@ -195,12 +184,18 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 ..
             } => {
                 // On 'R' reset the automata
-                automata_renderer = fresh_automata(&device, &bind_group_layout, swapchain_format, automata_dim);
+                automata_renderer = fresh_automata(
+                    &device,
+                    &bind_group_layout,
+                    swapchain_format,
+                    automata_dim,
+                    automata_p,
+                );
             }
             Event::RedrawRequested(_) => {
                 let now = Instant::now();
                 let elapsed = now - last_draw;
-                polar.update(elapsed.as_secs_f32());
+                //x_rotation += PI * (elapsed.as_secs_f32() / 10.);
 
                 let frame = surface
                     .get_current_texture()
@@ -213,12 +208,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 // If update delay has passed then use a compute
                 // pipeline to update the automata
                 since_last_update += elapsed;
+
                 if since_last_update >= FRAME_DELAY {
                     since_last_update = Duration::new(0, 0);
-                    let frame = automata_renderer.automata.update(&device, &queue);
-                    // TODO: Don't actually pull the frame back to the CPU unless
-                    // we really need to.
-                    //println!("{:?}", frame);
+                    automata_renderer.automata.update(&device, &queue);
                 }
 
                 let mut encoder =
@@ -251,15 +244,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         150.,
                     );
 
-                    let (x, y) = polar.position();
-                    //println!("{} {}", x, y);
-                    let view = Mat4::look_at_rh(
-                        Vec3::new(x + 10., y + 10., 10.),
-                        Vec3::new(10., 10., 10.),
-                        Vec3::Z,
-                    );
+                    let view = Mat4::from_translation(Vec3::new(0., 0., -60.));
 
-                    let projection_by_view = projection * view;
+                    let rotation = Mat4::from_rotation_y(x_rotation);
+
+                    let projection_by_view = projection * view * rotation;
 
                     queue.write_buffer(
                         &uniform_buf,

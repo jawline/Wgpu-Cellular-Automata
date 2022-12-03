@@ -2,7 +2,7 @@ struct VertexOutput {
     @builtin(position) proj_position: vec4<f32>,
     @location(0) world_normal: vec3<f32>,
     @location(1) world_position: vec4<f32>,
-    @location(2) texture_coordinate: vec3<f32>
+    @location(2) texture_coordinate: vec4<f32>
 };
 
 @group(0)
@@ -115,12 +115,18 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     let automata_state: u32 = input_tensor[automata_id];
 
     let position_offset = automata_id_to_offset(automata_id, automata_state);
-    let position: vec4<f32> = index_to_position(vertex_id);
+    let raw_position: vec4<f32> = index_to_position(vertex_id);
+    let position: vec4<f32> = raw_position - vec4<f32>(
+      f32(automata_dim.x) / 2.,
+      f32(automata_dim.y) / 2.,
+      f32(automata_dim.z) / 2.,
+      1.
+    );
   
     var result: VertexOutput;
     result.world_position = position;
     result.world_normal = vec3<f32>(0., 0., 0.);
-    result.texture_coordinate = vec3<f32>(1., 1., 1.);
+    result.texture_coordinate = raw_position;
     result.proj_position = transform * (position_offset + position);
     return result;
 }
@@ -129,6 +135,6 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 fn fs_main(
   @location(0) normal: vec3<f32>,
   @location(1) world_position: vec4<f32>,
-  @location(2) texture_coordinate: vec3<f32>) -> @location(0) vec4<f32> {
-    return vec4<f32>(world_position.x, world_position.y, world_position.z, 1.0);
+  @location(2) texture_coordinate: vec4<f32>) -> @location(0) vec4<f32> {
+    return vec4<f32>(texture_coordinate.x, texture_coordinate.y, texture_coordinate.z, 1.0);
 }

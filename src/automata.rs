@@ -1,8 +1,5 @@
 use glam::u32::UVec3;
 use std::borrow::Cow;
-use std::mem;
-use std::ops::Range;
-use std::sync::mpsc::channel;
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayout, Buffer, ComputePipeline, Device, Queue,
     RenderPass, RenderPipeline, TextureFormat,
@@ -19,13 +16,13 @@ pub struct Automata {
     pub compute_offset_buffer: Buffer,
     pub buffers: [Buffer; 2],
     pub bind_groups: Vec<BindGroup>,
-    pub buffer_idx: usize,
+    pub iteration: usize,
 }
 
 impl Automata {
-    pub fn new(dim: &UVec3, device: &Device) -> Self {
+    pub fn new(dim: &UVec3, p: f32, device: &Device) -> Self {
         let initial_state: Vec<u32> = (0..(dim.x * dim.y * dim.z))
-            .map(|_| if rand::random::<f32>() <= 0.1 { 1 } else { 0 })
+            .map(|_| if rand::random::<f32>() <= p { 1 } else { 0 })
             .collect();
 
         let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -152,46 +149,44 @@ impl Automata {
             buffers: automata_buffers,
             pipeline,
             bind_groups,
-            buffer_idx: 0,
+            iteration: 0,
             size: dim.x * dim.y * dim.z,
         }
     }
 
     pub fn update(&mut self, device: &Device, queue: &Queue) {
-        let buffer_idx = self.buffer_idx;
-        self.buffer_idx = (self.buffer_idx + 1) % 2;
+        let bind_group = self.iteration % 2;
+        self.iteration = self.iteration + 1;
 
-        let bind_group = &self.bind_groups[buffer_idx];
-        let output_buffer = &self.buffers[(buffer_idx + 1) % 2];
+        let bind_group = &self.bind_groups[bind_group];
 
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-        {
-            let mut cpass =
-                encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
-            cpass.set_pipeline(&self.pipeline);
-            cpass.set_bind_group(0, bind_group, &[]);
-
-            for z_offset in (0..self.dim.z).step_by(MAX_DIM_PER_COMPUTE_JOB.z as usize) {
-                for y_offset in (0..self.dim.y).step_by(MAX_DIM_PER_COMPUTE_JOB.y as usize) {
-                    for x_offset in (0..self.dim.x).step_by(MAX_DIM_PER_COMPUTE_JOB.x as usize) {
+        for z_offset in (0..self.dim.z).step_by(MAX_DIM_PER_COMPUTE_JOB.z as usize) {
+            for y_offset in (0..self.dim.y).step_by(MAX_DIM_PER_COMPUTE_JOB.y as usize) {
+                for x_offset in (0..self.dim.x).step_by(MAX_DIM_PER_COMPUTE_JOB.x as usize) {
+                    queue.write_buffer(
+                        &self.compute_offset_buffer,
+                        0,
+                        bytemuck::cast_slice(UVec3::new(x_offset, y_offset, z_offset).as_ref()),
+                    );
+                    let mut encoder = device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                    {
+                        let mut cpass = encoder
+                            .begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
+                        cpass.set_pipeline(&self.pipeline);
+                        cpass.set_bind_group(0, bind_group, &[]);
                         cpass.insert_debug_marker("A single automata iteration");
-                        queue.write_buffer(
-                            &self.compute_offset_buffer,
-                            0,
-                            bytemuck::cast_slice(UVec3::new(x_offset, y_offset, z_offset).as_ref()),
-                        );
                         cpass.dispatch_workgroups(
                             std::cmp::max(self.dim.x, MAX_DIM_PER_COMPUTE_JOB.x) as u32,
                             std::cmp::max(self.dim.x, MAX_DIM_PER_COMPUTE_JOB.y) as u32,
                             std::cmp::max(self.dim.x, MAX_DIM_PER_COMPUTE_JOB.z) as u32,
                         );
                     }
+
+                    queue.submit(Some(encoder.finish()));
                 }
             }
         }
-
-        queue.submit(Some(encoder.finish()));
     }
 }
 
@@ -307,12 +302,8 @@ impl AutomataRenderer {
 
     pub fn draw<'pass, 'automata: 'pass>(&'automata self, pass: &mut RenderPass<'pass>) {
         pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(
-            1,
-            /* TODO: This indexing is pretty awkward */
-            &self.bind_groups[self.automata.buffer_idx],
-            &[],
-        );
+        pass.set_bind_group(1, &self.bind_groups[self.automata.iteration % 2], &[]);
+
         pass.draw(
             0..self.automata.size * NUM_VERTICES_PER_BLOCK, /* TODO: Sub in number of triangles per cube */
             0..1,
