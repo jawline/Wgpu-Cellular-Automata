@@ -49,20 +49,12 @@ fn main(@builtin(global_invocation_id) pos: vec3<u32>) {
 
   let id: u32 = xyz_to_id(pos);
 
-  let currently_alive = input_tensor[id] > 0u;
+  let is_alive = input_tensor[id] > 0u;
   let num_neighbors: u32 = neighbors(pos) - input_tensor[id];
 
   var result: u32 = 0u;
 
-  if currently_alive {
-    if (num_neighbors >= 2u && num_neighbors <= 5u) {
-      result = 1u;
-    }
-  } else {
-    if num_neighbors == 3u {
-      result = 1u;
-    }
-  }
+  PLACEHOLDER
  
   output_tensor[id] = result;
 }

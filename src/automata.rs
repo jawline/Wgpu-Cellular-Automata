@@ -1,4 +1,5 @@
 use glam::u32::UVec3;
+use log::info;
 use std::borrow::Cow;
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayout, Buffer, ComputePipeline, Device, Queue,
@@ -20,16 +21,22 @@ pub struct Automata {
 }
 
 impl Automata {
-    pub fn new(dim: &UVec3, p: f32, device: &Device) -> Self {
+    pub fn new(dim: &UVec3, p: f32, dsl: crate::automata_dsl::Statement, device: &Device) -> Self {
         let initial_state: Vec<u32> = (0..(dim.x * dim.y * dim.z))
             .map(|_| if rand::random::<f32>() <= p { 1 } else { 0 })
             .collect();
 
+        let shader_rules = dsl.to_shader();
+
+        info!("Shader code: {}", shader_rules);
+
+        let shader = include_str!("../shaders/compute_automata.wgsl")
+            .to_string()
+            .replace("PLACEHOLDER", &shader_rules);
+
         let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-                "../shaders/compute_automata.wgsl"
-            ))),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&shader)),
         });
 
         let slice_size = initial_state.len() * std::mem::size_of::<u32>();

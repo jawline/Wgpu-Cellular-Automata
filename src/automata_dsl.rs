@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     U32(u32),
     Alive,
@@ -7,6 +7,8 @@ pub enum Expr {
     Gte(Box<Expr>, Box<Expr>),
     Lt(Box<Expr>, Box<Expr>),
     Lte(Box<Expr>, Box<Expr>),
+    And(Box<Expr>, Box<Expr>),
+    Or(Box<Expr>, Box<Expr>),
     Equal(Box<Expr>, Box<Expr>),
 }
 
@@ -15,19 +17,41 @@ use Expr::*;
 impl Expr {
     pub fn to_shader(&self) -> String {
         match self {
-            U32(val) => format!("{}", val),
+            U32(val) => format!("{}u", val),
             Alive => format!("is_alive"),
             Neighbors => format!("num_neighbors"),
-            Gt(lhs, rhs) => format!("{} > {}", Self::to_shader(lhs), Self::to_shader(rhs)),
-            Gte(lhs, rhs) => format!("{} >= {}", Self::to_shader(lhs), Self::to_shader(rhs)),
-            Lt(lhs, rhs) => format!("{} < {}", Self::to_shader(lhs), Self::to_shader(rhs)),
-            Lte(lhs, rhs) => format!("{} <= {}", Self::to_shader(lhs), Self::to_shader(rhs)),
-            Equal(lhs, rhs) => format!("{} == {}", Self::to_shader(lhs), Self::to_shader(rhs)),
+            Gt(lhs, rhs) => format!(
+                "u32(({}) > ({}))",
+                Self::to_shader(lhs),
+                Self::to_shader(rhs)
+            ),
+            Gte(lhs, rhs) => format!(
+                "u32(({}) >= ({}))",
+                Self::to_shader(lhs),
+                Self::to_shader(rhs)
+            ),
+            Lt(lhs, rhs) => format!(
+                "u32(({}) < ({}))",
+                Self::to_shader(lhs),
+                Self::to_shader(rhs)
+            ),
+            Lte(lhs, rhs) => format!(
+                "u32(({}) <= ({}))",
+                Self::to_shader(lhs),
+                Self::to_shader(rhs)
+            ),
+            And(lhs, rhs) => format!("(({}) & ({}))", Self::to_shader(lhs), Self::to_shader(rhs)),
+            Or(lhs, rhs) => format!("(({}) | ({}))", Self::to_shader(lhs), Self::to_shader(rhs)),
+            Equal(lhs, rhs) => format!(
+                "u32(({}) == ({}))",
+                Self::to_shader(lhs),
+                Self::to_shader(rhs)
+            ),
         }
     }
 }
 
-pub fn u32(value: u32) -> Expr {
+pub fn const_u32(value: u32) -> Expr {
     U32(value)
 }
 
@@ -55,14 +79,23 @@ pub fn lte(lhs: Expr, rhs: Expr) -> Expr {
     Lte(Box::new(lhs), Box::new(rhs))
 }
 
+pub fn and(lhs: Expr, rhs: Expr) -> Expr {
+    And(Box::new(lhs), Box::new(rhs))
+}
+
+pub fn or(lhs: Expr, rhs: Expr) -> Expr {
+    Or(Box::new(lhs), Box::new(rhs))
+}
+
 pub fn equal(lhs: Expr, rhs: Expr) -> Expr {
     Equal(Box::new(lhs), Box::new(rhs))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
+    Void,
     SetResult(Expr),
-    If {
+    IfThenElse {
         condition: Expr,
         if_true_then: Box<Statement>,
         if_false_then: Box<Statement>,
@@ -74,8 +107,9 @@ use Statement::*;
 impl Statement {
     pub fn to_shader(&self) -> String {
         match self {
-            SetResult(expr) => format!("result = {}", expr.to_shader()),
-            If {
+            Void => format!(""),
+            SetResult(expr) => format!("result = {};", expr.to_shader()),
+            IfThenElse {
                 condition,
                 if_true_then,
                 if_false_then,
@@ -86,5 +120,25 @@ impl Statement {
                 if_false_then.to_shader()
             ),
         }
+    }
+}
+
+pub fn void() -> Statement {
+    Void
+}
+
+pub fn set_result(expr: Expr) -> Statement {
+    SetResult(expr)
+}
+
+pub fn if_then_else(
+    condition: Expr,
+    if_true_then: Statement,
+    if_false_then: Statement,
+) -> Statement {
+    IfThenElse {
+        condition,
+        if_true_then: Box::new(if_true_then),
+        if_false_then: Box::new(if_false_then),
     }
 }

@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use automata_lib::{Automata, AutomataRenderer};
+use automata_lib::*;
 use std::time::{Duration, Instant};
 
 use glam::{u32::UVec3, Mat4, Vec3};
@@ -14,18 +14,30 @@ use winit::{
 
 const FRAME_DELAY: Duration = Duration::new(0, 100000000);
 
+fn conways_game_of_life() -> Statement {
+    if_then_else(
+        alive(),
+        set_result(or(
+            equal(neighbors(), const_u32(2)),
+            equal(neighbors(), const_u32(3)),
+        )),
+        set_result(equal(neighbors(), const_u32(3))),
+    )
+}
+
 fn fresh_automata(
     device: &Device,
     bind_group_layout: &BindGroupLayout,
     swapchain_format: TextureFormat,
     dim: UVec3,
     p: f32,
+    dsl: Statement,
 ) -> AutomataRenderer {
     AutomataRenderer::new(
         &device,
         &bind_group_layout,
         swapchain_format,
-        Automata::new(&dim, p, &device),
+        Automata::new(&dim, p, dsl, &device),
     )
 }
 
@@ -137,13 +149,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut last_draw = Instant::now();
     let half_dim = 60;
     let automata_dim = UVec3::new(half_dim * 2, half_dim * 2, 3);
-    let automata_p = 0.01;
+    let automata_p = 0.05;
+    let automata_rules = conways_game_of_life();
+
     let mut automata_renderer = fresh_automata(
         &device,
         &bind_group_layout,
         swapchain_format,
         automata_dim,
         automata_p,
+        automata_rules.clone(),
     );
 
     let mut since_last_update = FRAME_DELAY;
@@ -190,6 +205,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     swapchain_format,
                     automata_dim,
                     automata_p,
+                    automata_rules.clone(),
                 );
             }
             Event::RedrawRequested(_) => {
