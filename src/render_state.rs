@@ -1,7 +1,7 @@
-use glam::{u32::UVec3, Mat4, Vec3};
+use glam::Mat4;
 use wgpu::{
-    util::DeviceExt, BindGroup, BindGroupLayout, Buffer, Device, Instance, Queue, Surface,
-    SurfaceConfiguration, Texture, TextureFormat, TextureView,
+    BindGroup, BindGroupLayout, Buffer, Device, Instance, Queue, Surface, SurfaceConfiguration,
+    Texture, TextureFormat, TextureView,
 };
 use winit::window::Window;
 pub struct RenderState {
@@ -47,7 +47,7 @@ impl RenderState {
 
         let swapchain_format = surface.get_supported_formats(&adapter)[0];
 
-        let mut config = wgpu::SurfaceConfiguration {
+        let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: swapchain_format,
             width: size.width,
@@ -72,14 +72,7 @@ impl RenderState {
                 }],
             });
 
-        let mx_total = Mat4::IDENTITY;
-        let mx_ref: &[f32; 16] = mx_total.as_ref();
-
-        let projection_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Projection Matrix"),
-            contents: bytemuck::cast_slice(mx_ref),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let projection_buffer = crate::util::mat4_identity(&device);
 
         let general_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &general_bind_group_layout,

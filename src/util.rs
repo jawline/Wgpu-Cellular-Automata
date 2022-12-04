@@ -1,4 +1,5 @@
-use wgpu::{Device, Texture, TextureView};
+use glam::Mat4;
+use wgpu::{util::DeviceExt, Buffer, Device, Texture, TextureView};
 
 pub fn generate_depth_buffer(
     device: &Device,
@@ -24,4 +25,15 @@ pub fn generate_depth_buffer(
     let draw_depth_buffer_view =
         draw_depth_buffer.create_view(&wgpu::TextureViewDescriptor::default());
     (draw_depth_buffer, draw_depth_buffer_view)
+}
+
+pub fn mat4_identity(device: &Device) -> Buffer {
+    let mx_total = Mat4::IDENTITY;
+    let mx_ref: &[f32; 16] = mx_total.as_ref();
+
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Projection Matrix"),
+        contents: bytemuck::cast_slice(mx_ref),
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    })
 }
