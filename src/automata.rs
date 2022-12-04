@@ -23,7 +23,6 @@ pub struct Automata {
 
 impl Automata {
     pub fn new(dim: &UVec3, p: f32, dsl: crate::automata_dsl::Statement, device: &Device) -> Self {
-
         let initial_state: Vec<u32> = (0..(dim.x * dim.y * dim.z))
             .map(|_| if rand::random::<f32>() <= p { 1 } else { 0 })
             .collect();
@@ -308,9 +307,6 @@ impl AutomataRenderer {
     pub fn draw<'pass, 'automata: 'pass>(&'automata self, pass: &mut RenderPass<'pass>) {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(1, &self.bind_groups[self.automata.iteration % 2], &[]);
-        pass.draw(
-            0..self.automata.size * NUM_VERTICES_PER_BLOCK,
-            0..1,
-        );
+        pass.draw(0..self.automata.size * NUM_VERTICES_PER_BLOCK, 0..1);
     }
 }
