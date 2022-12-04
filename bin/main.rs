@@ -63,79 +63,40 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     WindowEvent::KeyboardInput {
                         input:
                             winit::event::KeyboardInput {
-                                virtual_keycode: Some(VirtualKeyCode::W),
+                                virtual_keycode: Some(keycode),
                                 ..
                             },
                         ..
                     },
                 ..
             } => {
-                y_off -= 1.;
-            }
-            Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            winit::event::KeyboardInput {
-                                virtual_keycode: Some(VirtualKeyCode::S),
-                                ..
-                            },
-                        ..
-                    },
-                ..
-            } => {
-                y_off += 1.;
-            }
-
-            Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            winit::event::KeyboardInput {
-                                virtual_keycode: Some(VirtualKeyCode::A),
-                                ..
-                            },
-                        ..
-                    },
-                ..
-            } => {
-                x_off += 1.;
-            }
-            Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            winit::event::KeyboardInput {
-                                virtual_keycode: Some(VirtualKeyCode::D),
-                                ..
-                            },
-                        ..
-                    },
-                ..
-            } => {
-                x_off -= 1.;
-            }
-            Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            winit::event::KeyboardInput {
-                                virtual_keycode: Some(VirtualKeyCode::R),
-                                ..
-                            },
-                        ..
-                    },
-                ..
-            } => {
-                // On 'R' reset the automata
-                automata_renderer = fresh_automata(
-                    &render_state.device,
-                    &render_state.general_bind_group_layout,
-                    render_state.swapchain_format,
-                    automata_dim,
-                    automata_p,
-                    automata_rules.clone(),
-                );
+                use VirtualKeyCode::*;
+                match keycode {
+                    W => {
+                        y_off -= 1.;
+                    }
+                    S => {
+                        y_off += 1.;
+                    }
+                    A => {
+                        x_off += 1.;
+                    }
+                    D => {
+                        x_off -= 1.;
+                    }
+                    R => {
+                        // On 'R' reset the automata
+                        automata_renderer = fresh_automata(
+                            &render_state.device,
+                            &render_state.general_bind_group_layout,
+                            render_state.swapchain_format,
+                            automata_dim,
+                            automata_p,
+                            automata_rules.clone(),
+                        );
+                    }
+                    _ => {}
+                }
             }
             Event::RedrawRequested(_) => {
                 let now = Instant::now();
@@ -193,8 +154,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     );
 
                     let view = Mat4::from_translation(Vec3::new(x_off, y_off, -250.));
-                    let rotation = Mat4::from_rotation_y(x_rotation);
-                    render_state.set_projection(projection * view * rotation);
+                    render_state.set_projection(projection * view);
 
                     rpass.set_bind_group(0, &render_state.general_bind_group, &[]);
                     automata_renderer.draw(&mut rpass);
