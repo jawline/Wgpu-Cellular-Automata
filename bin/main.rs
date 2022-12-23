@@ -18,7 +18,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut last_draw = Instant::now();
     let automata_dim = UVec3::new(500, 500, 3);
     let automata_p = 0.02;
-    let automata_rules = conways_game_of_life();
+    let automata_rules = rulesets::conways_game_of_life();
 
     let render_ref = render_state.clone();
     let fresh_automata = move || {
@@ -40,6 +40,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let mut since_last_update = FRAME_DELAY;
     let mut camera = SimpleCamera::new();
+    camera.z_off = -250.;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;

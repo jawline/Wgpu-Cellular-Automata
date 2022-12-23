@@ -1,9 +1,13 @@
 use glam::{Mat4, Vec3};
 use winit::event::{ElementState, VirtualKeyCode};
 
+/**
+ * A simple WASD driven camera that moves in two dimensions.
+ */
 pub struct SimpleCamera {
     pub x_off: f32,
     pub y_off: f32,
+    pub z_off: f32,
 
     /* A scalar that is 1. if the key is down or 0. if the key is not */
     pub a_down: f32,
@@ -17,6 +21,7 @@ impl SimpleCamera {
         Self {
             x_off: 0.,
             y_off: 0.,
+            z_off: 0.,
             a_down: 0.,
             d_down: 0.,
             w_down: 0.,
@@ -48,7 +53,7 @@ impl SimpleCamera {
     }
 
     pub fn update(&mut self, elapsed: f32) {
-        let distance = 15. * elapsed;
+        let distance = 45. * elapsed;
         let x_off_delta = (self.a_down * distance) + (self.d_down * -1. * distance);
         let y_off_delta = (self.w_down * distance * -1.) + (self.s_down * distance);
         self.x_off += x_off_delta;
@@ -56,6 +61,6 @@ impl SimpleCamera {
     }
 
     pub fn view(&self) -> Mat4 {
-        Mat4::from_translation(Vec3::new(self.x_off, self.y_off, -250.))
+        Mat4::from_translation(Vec3::new(self.x_off, self.y_off, self.z_off))
     }
 }

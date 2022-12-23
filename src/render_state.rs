@@ -4,6 +4,11 @@ use wgpu::{
     Texture, TextureFormat, TextureView,
 };
 use winit::window::Window;
+
+/**
+ * All the general state we need for the renderer, including the general bind group (the group that
+ * binds the projection matrix), the depth buffer, the render work queue, device, instance, etc.
+ */
 pub struct RenderState {
     pub instance: Instance,
     pub surface: Surface,
