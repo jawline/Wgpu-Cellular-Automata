@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use glam::{u32::UVec3, Mat4, Vec3};
+use glam::u32::UVec3;
 
 use winit::{
     event::{Event, VirtualKeyCode, WindowEvent},
@@ -39,8 +39,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut automata_renderer = fresh_automata();
 
     let mut since_last_update = FRAME_DELAY;
-    let mut x_off = 0.;
-    let mut y_off = 0.;
+    let mut camera = SimpleCamera::new();
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -60,6 +59,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         input:
                             winit::event::KeyboardInput {
                                 virtual_keycode: Some(keycode),
+                                state,
                                 ..
                             },
                         ..
@@ -68,29 +68,20 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             } => {
                 use VirtualKeyCode::*;
                 match keycode {
-                    W => {
-                        y_off -= 1.;
-                    }
-                    S => {
-                        y_off += 1.;
-                    }
-                    A => {
-                        x_off += 1.;
-                    }
-                    D => {
-                        x_off -= 1.;
-                    }
                     R => {
                         // On 'R' reset the automata
                         automata_renderer = fresh_automata();
                     }
                     _ => {}
                 }
+                camera.key(keycode, state);
             }
             Event::RedrawRequested(_) => {
                 let render_state = render_state.borrow();
                 let now = Instant::now();
                 let elapsed = now - last_draw;
+
+                camera.update(elapsed.as_secs_f32());
 
                 let frame = render_state
                     .surface
@@ -143,7 +134,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         1500.,
                     );
 
-                    let view = Mat4::from_translation(Vec3::new(x_off, y_off, -250.));
+                    let view = camera.view();
                     render_state.set_projection(projection * view);
 
                     rpass.set_bind_group(0, &render_state.general_bind_group, &[]);
