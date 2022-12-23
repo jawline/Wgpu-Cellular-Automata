@@ -1,48 +1,42 @@
 use automata_lib::*;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use glam::{u32::UVec3, Mat4, Vec3};
 
-use wgpu::{BindGroupLayout, Device, TextureFormat};
 use winit::{
     event::{Event, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
 
-const FRAME_DELAY: Duration = Duration::new(0, 100000000);
-
-fn fresh_automata(
-    device: &Device,
-    bind_group_layout: &BindGroupLayout,
-    swapchain_format: TextureFormat,
-    dim: UVec3,
-    p: f32,
-    dsl: Statement,
-) -> AutomataRenderer {
-    AutomataRenderer::new(
-        &device,
-        &bind_group_layout,
-        swapchain_format,
-        Automata::new(&dim, p, dsl, &device),
-    )
-}
+const FRAME_DELAY: Duration = Duration::new(0, 50000000);
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
-    let mut render_state = RenderState::new(&window).await;
+    let render_state = Rc::new(RefCell::new(RenderState::new(&window).await));
     let mut last_draw = Instant::now();
     let automata_dim = UVec3::new(500, 500, 3);
     let automata_p = 0.02;
     let automata_rules = conways_game_of_life();
 
-    let mut automata_renderer = fresh_automata(
-        &render_state.device,
-        &render_state.general_bind_group_layout,
-        render_state.swapchain_format,
-        automata_dim,
-        automata_p,
-        automata_rules.clone(),
-    );
+    let render_ref = render_state.clone();
+    let fresh_automata = move || {
+        let render_ref = render_ref.borrow();
+        AutomataRenderer::new(
+            &render_ref.device,
+            &render_ref.general_bind_group_layout,
+            render_ref.swapchain_format,
+            Automata::new(
+                &automata_dim,
+                automata_p,
+                automata_rules.clone(),
+                &render_ref.device,
+            ),
+        )
+    };
+
+    let mut automata_renderer = fresh_automata();
 
     let mut since_last_update = FRAME_DELAY;
     let mut x_off = 0.;
@@ -55,7 +49,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                render_state.reconfigure(size.width, size.height);
+                render_state
+                    .borrow_mut()
+                    .reconfigure(size.width, size.height);
                 window.request_redraw();
             }
             Event::WindowEvent {
@@ -86,19 +82,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     }
                     R => {
                         // On 'R' reset the automata
-                        automata_renderer = fresh_automata(
-                            &render_state.device,
-                            &render_state.general_bind_group_layout,
-                            render_state.swapchain_format,
-                            automata_dim,
-                            automata_p,
-                            automata_rules.clone(),
-                        );
+                        automata_renderer = fresh_automata();
                     }
                     _ => {}
                 }
             }
             Event::RedrawRequested(_) => {
+                let render_state = render_state.borrow();
                 let now = Instant::now();
                 let elapsed = now - last_draw;
 

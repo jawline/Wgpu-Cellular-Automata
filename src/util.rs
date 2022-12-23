@@ -1,4 +1,4 @@
-use glam::Mat4;
+use glam::{Mat4, UVec3};
 use wgpu::{util::DeviceExt, Buffer, Device, Texture, TextureView};
 
 pub fn generate_depth_buffer(
@@ -25,6 +25,14 @@ pub fn generate_depth_buffer(
     let draw_depth_buffer_view =
         draw_depth_buffer.create_view(&wgpu::TextureViewDescriptor::default());
     (draw_depth_buffer, draw_depth_buffer_view)
+}
+
+pub fn uvec_buffer(device: &Device, initial: &UVec3) -> Buffer {
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Generated UVec"),
+        contents: bytemuck::cast_slice(initial.as_ref()),
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+    })
 }
 
 pub fn mat4_identity(device: &Device) -> Buffer {

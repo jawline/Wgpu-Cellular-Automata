@@ -43,21 +43,9 @@ impl Automata {
         let slice_size = initial_state.len() * std::mem::size_of::<u32>();
         let size = slice_size as wgpu::BufferAddress;
 
-        let automata_dim_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Automata Tensor Dimensions"),
-            contents: bytemuck::cast_slice(dim.as_ref()),
-            usage: wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
-        });
+        let automata_dim_buffer = crate::util::uvec_buffer(device, &dim);
 
-        let compute_offset_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Automata Tensor Dimensions"),
-            contents: bytemuck::cast_slice(UVec3::new(0, 0, 0).as_ref()),
-            usage: wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
-        });
+        let compute_offset_buffer = crate::util::uvec_buffer(device, &UVec3::new(0, 0, 0));
 
         let automata_buffers = [
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
